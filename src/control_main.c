@@ -14,7 +14,7 @@ void *scan_target(void *arg) {
 
     char cmd[512];
     snprintf(cmd, sizeof(cmd),
-    "cat ./surveyor | ssh -i ~/.ssh/surveyor_key "
+    "cat ./build/bin/surveyor | ssh -i ~/.ssh/surveyor_key "
     "-o BatchMode=yes "
     "%s@%s",
     ctx->user, ctx->target);
