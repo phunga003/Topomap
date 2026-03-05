@@ -1,7 +1,6 @@
 #include <pthread.h>
 #include "surveyor.h"
 #include <stdio.h>
-#include "control.c"
 
 typedef struct {
     char *target;
