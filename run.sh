@@ -2,7 +2,7 @@
 
 SCRIPT_DIR=$(dirname "$0")
 SURVEYOR_BIN="${SCRIPT_DIR}/build/bin/surveyor"
-SCAN_BIN="${SCRIPT_DIR}/build/bin/scan"
+SCAN_BIN="${SCRIPT_DIR}/build/bin/dispatcher"
 SETUP_SCRIPT="${SCRIPT_DIR}/setup_keys.sh"
 
 USER=$1
