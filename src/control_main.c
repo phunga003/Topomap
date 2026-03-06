@@ -1,55 +1,54 @@
-#include <pthread.h>
-#include "snapshot.h"
+#include "session.h"
+#include "scanner.h"
 #include <stdio.h>
-
-typedef struct {
-    char *target;
-    char *user;
-    MachineSnapshot snap;
-    int success;
-} TargetCtx;
-
-void *scan_target(void *arg) {
-    TargetCtx *ctx = (TargetCtx *)arg;
-
-    char cmd[512];
-    snprintf(cmd, sizeof(cmd),
-    "cat ./build/bin/surveyor | ssh -i ~/.ssh/surveyor_key "
-    "-o BatchMode=yes "
-    "%s@%s",
-    ctx->user, ctx->target);
-
-    FILE *stream = popen(cmd, "r");
-    if (!stream) { 
-        ctx->success = 0; return NULL; 
-    }
-
-    ctx->success = (read_snapshot(stream, &ctx->snap) == 0);
-    pclose(stream);
-    return NULL;
-}
+#include <string.h>
 
 int main(int argc, char **argv) {
-    int target_count = argc - 2;
-    TargetCtx targets[target_count];
-    pthread_t threads[target_count];
+    const char *user = argc > 1 ? argv[1] : "root";
+    const char *workdir = argc > 2 ? argv[2] : NULL;
 
-    for (int i = 0; i < target_count; i++) {
-        targets[i].target = argv[i + 2];
-        targets[i].user = argv[1];
-        pthread_create(&threads[i], NULL, scan_target, &targets[i]);
+    Session session;
+    if (session_init(&session, workdir, user) != 0) {
+        fprintf(stderr, "Failed to initialize session\n");
+        return 1;
     }
 
-    for (int i = 0; i < target_count; i++) {
-        pthread_join(threads[i], NULL);
-        if (targets[i].success) {
-            printf("\n=== %s ===\n", targets[i].target);
-            print_topology(&targets[i].snap);
-            free_snapshot(&targets[i].snap);
-        } else {
-            printf("\n=== %s FAILED ===\n", targets[i].target);
+    if (session.node_count > 0) {
+        printf("Loaded %d node(s) from previous session\n", session.node_count);
+    }
+
+    // enroll and scan targets from argv
+    int target_count = argc > 2 ? argc - 2 : 0;
+    if (target_count > 0) {
+        TargetCtx targets[target_count];
+        memset(targets, 0, sizeof(TargetCtx) * target_count);
+
+        for (int i = 0; i < target_count; i++) {
+            targets[i].target = argv[i + 2];
+            targets[i].user = (char *)user;
+            session_enroll(&session, argv[i + 2], user);
+        }
+
+        dispatch_scan(targets, target_count);
+
+        for (int i = 0; i < target_count; i++) {
+            if (!targets[i].success) continue;
+
+            int idx = session_find_node(&session, targets[i].target);
+            if (idx < 0) continue;
+
+            if (session.nodes[idx].has_snapshot)
+                free_snapshot(&session.nodes[idx].snap);
+
+            session.nodes[idx].snap = targets[i].snap;
+            session.nodes[idx].has_snapshot = 1;
+            session_save_snapshot(&session, idx);
         }
     }
 
+    register_commands(&session);
+    repl_run(&session);
+
+    session_destroy(&session);
     return 0;
 }

@@ -1,7 +1,8 @@
-#include <stdio.h>
-#include "hashmap.h"
 #ifndef SNAPSHOT_H
 #define SNAPSHOT_H
+
+#include <stdio.h>
+#include "hashmap.h"
 
 // --- Constatnts ---
 #define SNAPSHOT_VERSION 1

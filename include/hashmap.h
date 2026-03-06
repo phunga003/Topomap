@@ -1,8 +1,9 @@
+#ifndef HASHMAP_H
+#define HASHMAP_H
+
 #include <stdint.h>
 #include <string.h>
 
-#ifndef HASHMAP_H
-#define HASHMAP_H
 
 #define MAP_BUCKETS 8192
 #define MAP_MASK (MAP_BUCKETS - 1)
