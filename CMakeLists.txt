@@ -29,3 +29,6 @@ add_executable(dispatcher
 )
 target_include_directories(dispatcher PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(dispatcher pthread)
+
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_C_FLAGS_DEBUG "-g -O0")

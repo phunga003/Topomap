@@ -79,11 +79,13 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
 
     int magic;
     if (safe_read(f, &magic, sizeof(int)) != 0) return -1;
-    if (magic != 0x534E4150) {
+    if (magic != SNAPSHOT_MAGIC) {
         fprintf(stderr, "Bad magic: %X\n", magic);
         return -1;
     }
-
+    int version;
+    if (safe_read(f, &version, sizeof(int)) != 0) return -1;
+    if (version != SNAPSHOT_VERSION) return -1; // TODO: Consider removing version cause of redundancy
     if (safe_read(f, &snap->identity_count, sizeof(int)) != 0) return -1;
 
     snap->identities = malloc(sizeof(Identity) * snap->identity_count);
