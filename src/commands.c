@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "scanner.h"
+#include "command_utils.h"
 
 static int cmd_list(Session *s, CommandArgs *args) {
     (void)args;
@@ -61,18 +62,7 @@ static int cmd_unenroll(Session *s, CommandArgs *args) {
         session_report_path(s, ip, path, sizeof(path));
         FILE *f = fopen(path, "w");
         if (f) {
-            // TODO: print_node_report writes to file
-            // for now just dump identity summary
-            MachineSnapshot *snap = &s->nodes[idx].snap;
-            fprintf(f, "Final report for %s\n", ip);
-            fprintf(f, "Identities: %d\n\n", snap->identity_count);
-            for (int i = 0; i < snap->identity_count; i++) {
-                Identity *id = &snap->identities[i];
-                fprintf(f, "PID:%d EXE:%s\n", id->pid, id->exe);
-                fprintf(f, "  ingress:%d egress:%d local:%d unix:%d\n",
-                    id->ingress_count, id->egress_count,
-                    id->local_count, id->unix_count);
-            }
+            print_node(f, &s->nodes[idx]);
             fclose(f);
             printf("Final report saved to %s\n", path);
         }
@@ -140,7 +130,38 @@ static int cmd_scan(Session *s, CommandArgs *args) {
     return 0;
 }
 
+static int cmd_report(Session *s, CommandArgs *args) {
+    const char *outpath = args->argc > 2 ? args->argv[2] : NULL;
+    FILE *out = open_output(outpath);
+    if (!out) return -1;
 
+    // single node
+    if (args->argc > 1) {
+        int idx = session_find_node(s, args->argv[1]);
+        if (idx < 0) {
+            fprintf(stderr, "%s not enrolled\n", args->argv[1]);
+            close_output(out, outpath);
+            return -1;
+        }
+        if (!s->nodes[idx].has_snapshot) {
+            fprintf(stderr, "%s has no snapshot data\n", args->argv[1]);
+            close_output(out, outpath);
+            return -1;
+        }
+        print_node(out, &s->nodes[idx]);
+        close_output(out, outpath);
+        return 0;
+    }
+
+    // all nodes
+    for (int i = 0; i < s->node_count; i++) {
+        if (!s->nodes[i].has_snapshot) continue;
+        print_node(out, &s->nodes[i]);
+    }
+
+    close_output(out, outpath);
+    return 0;
+}
 
 typedef struct {
     char *name;
@@ -149,23 +170,21 @@ typedef struct {
     CommandFn fn;
 } CommandDef;
 
-void register_commands(Session *s) {
-    static CommandDef commands[] = {
+static CommandDef commands[] = {
     { "list",    "list",               "Show all enrolled nodes",   cmd_list },
     { "enroll",  "enroll <ip> [user]", "Add a node for surveying",  cmd_enroll },
     { "unenroll","unenroll <ip>",      "Remove a node",             cmd_unenroll },
     { "scan",    "scan [ip]",          "Scan enrolled nodes",       cmd_scan },
     { "report",  "report [ip] [file]", "Print topology report",     cmd_report },
-    { "map",     "map [file]",         "Print connection map",      cmd_map },
-    { "exec",    "exec <ip> <cmd>",    "Run command on a node",     cmd_exec },
-    };
+    //{ "map",     "map [file]",         "Print connection map",      cmd_map },
+    //{ "exec",    "exec <ip> <cmd>",    "Run command on a node",     cmd_exec },
+};
 
-    void register_commands(Session *s) {
-        int count = sizeof(commands) / sizeof(commands[0]);
-        for (int i = 0; i < count; i++) {
-            registry_add(s, commands[i].name, commands[i].usage,
-                        commands[i].help, commands[i].fn);
-        }
+void register_commands(Session *s) {
+    int count = sizeof(commands) / sizeof(commands[0]);
+    for (int i = 0; i < count; i++) {
+        registry_add(s, commands[i].name, commands[i].usage,
+                    commands[i].help, commands[i].fn);
     }
-    
+
 }
