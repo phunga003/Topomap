@@ -2,8 +2,10 @@
 #include "command_engine.h"
 #include <stdio.h>
 #include <string.h>
+#include <sys/wait.h>
 #include "scanner.h"
 #include "command_utils.h"
+#include "map.h"
 
 static int cmd_list(Session *s, CommandArgs *args) {
     (void)args;
@@ -163,6 +165,136 @@ static int cmd_report(Session *s, CommandArgs *args) {
     return 0;
 }
 
+static int cmd_map(Session *s, CommandArgs *args) {
+    const char *outpath = args->argc > 1 ? args->argv[1] : NULL;
+    FILE *out = open_output(outpath);
+    if (!out) return -1;
+
+    int nodes_with_data = 0;
+    for (int i = 0; i < s->node_count; i++) {
+        if (s->nodes[i].has_snapshot) nodes_with_data++;
+    }
+    if (nodes_with_data == 0) {
+        fprintf(stderr, "No snapshot data. Run 'scan' first.\n");
+        close_output(out, outpath);
+        return -1;
+    }
+
+    TopologyMap map;
+    build_topology_map(s, &map);
+
+    int total_svc = 0;
+    for (int i = 0; i < s->node_count; i++) {
+        if (s->nodes[i].has_snapshot)
+            total_svc += s->nodes[i].snap.identity_count;
+    }
+
+    fprintf(out, "==============================================================\n");
+    fprintf(out, "  NETWORK TOPOLOGY MAP\n");
+    fprintf(out, "  Nodes: %d    Services: %d\n", nodes_with_data, total_svc);
+    fprintf(out, "==============================================================\n");
+
+    print_attack_surface(out, s);
+    print_edge_section(out, "CROSS-NODE CONNECTIONS (lateral movement paths)", &map.cross, 1);
+    print_edge_section(out, "SAME-NODE CONNECTIONS", &map.local, 0);
+    print_edge_section(out, "UNIX SOCKET CONNECTIONS", &map.unix_edges, 0);
+    print_edge_section(out, "UNRESOLVED (external or down)", &map.unresolved, 1);
+    print_hardening_checklist(out, s, &map.cross, &map.unresolved);
+
+    fprintf(out, "\n==============================================================\n");
+
+    close_output(out, outpath);
+    topology_map_free(&map);
+    return 0;
+}
+
+static int cmd_exec(Session *s, CommandArgs *args) {
+    if (args->argc < 3) {
+        fprintf(stderr, "Usage: exec <ip> <binary>\n"
+                        "       exec shell <ip> <command...>\n");
+        return -1;
+    }
+
+    // exec shell <ip> <command...>
+    if (strcmp(args->argv[1], "shell") == 0) {
+        if (args->argc < 4) {
+            fprintf(stderr, "Usage: exec shell <ip> <command...>\n");
+            return -1;
+        }
+
+        const char *ip = args->argv[2];
+        int idx = session_find_node(s, ip);
+        if (idx < 0) {
+            fprintf(stderr, "%s not enrolled\n", ip);
+            return -1;
+        }
+
+        // rebuild command string from remaining args
+        char remote_cmd[1024] = {0};
+        for (int i = 3; i < args->argc; i++) {
+            if (i > 3) strncat(remote_cmd, " ", sizeof(remote_cmd) - strlen(remote_cmd) - 1);
+            strncat(remote_cmd, args->argv[i], sizeof(remote_cmd) - strlen(remote_cmd) - 1);
+        }
+
+        char cmd[2048];
+        snprintf(cmd, sizeof(cmd),
+            "ssh -i ~/.ssh/surveyor_key "
+            "-o BatchMode=yes "
+            "-o StrictHostKeyChecking=no "
+            "%s@%s 'sudo %s'",
+            s->nodes[idx].user, ip, remote_cmd);
+
+        FILE *stream = popen(cmd, "r");
+        if (!stream) {
+            perror("popen");
+            return -1;
+        }
+
+        char buf[4096];
+        while (fgets(buf, sizeof(buf), stream))
+            printf("%s", buf);
+
+        int status = pclose(stream);
+        printf("\n[exit: %d]\n", WEXITSTATUS(status));
+        return 0;
+    }
+
+    // exec <ip> <binary>
+    const char *ip = args->argv[1];
+    const char *binary = args->argv[2];
+    int idx = session_find_node(s, ip);
+    if (idx < 0) {
+        fprintf(stderr, "%s not enrolled\n", ip);
+        return -1;
+    }
+
+    char cmd[2048];
+    snprintf(cmd, sizeof(cmd),
+        "cat %s | ssh -i ~/.ssh/surveyor_key "
+        "-o BatchMode=yes "
+        "-o StrictHostKeyChecking=no "
+        "%s@%s '"
+        "cat > /dev/shm/.x && "
+        "chmod +x /dev/shm/.x && "
+        "sudo /dev/shm/.x && "
+        "rm -f /dev/shm/.x'",
+        binary, s->nodes[idx].user, ip);
+
+    FILE *stream = popen(cmd, "r");
+    if (!stream) {
+        perror("popen");
+        return -1;
+    }
+
+    char buf[4096];
+    while (fgets(buf, sizeof(buf), stream))
+        printf("%s", buf);
+
+    int status = pclose(stream);
+    printf("\n[exit: %d]\n", WEXITSTATUS(status));
+    return 0;
+}
+
 typedef struct {
     char *name;
     char *usage;
@@ -176,8 +308,8 @@ static CommandDef commands[] = {
     { "unenroll","unenroll <ip>",      "Remove a node",             cmd_unenroll },
     { "scan",    "scan [ip]",          "Scan enrolled nodes",       cmd_scan },
     { "report",  "report [ip] [file]", "Print topology report",     cmd_report },
-    //{ "map",     "map [file]",         "Print connection map",      cmd_map },
-    //{ "exec",    "exec <ip> <cmd>",    "Run command on a node",     cmd_exec },
+    { "map",     "map [file]",         "Print connection map",      cmd_map },
+    { "exec", "exec <ip> <bin> | exec shell <ip> <cmd>", "Execute binary or shell command on node", cmd_exec },
 };
 
 void register_commands(Session *s) {
