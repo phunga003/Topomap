@@ -1,7 +1,11 @@
 #include <stdio.h>
 #include "hashmap.h"
-#ifndef SURVEYOR_H
-#define SURVEYOR_H
+#ifndef SNAPSHOT_H
+#define SNAPSHOT_H
+
+// --- Constatnts ---
+#define SNAPSHOT_VERSION 1
+#define SNAPSHOT_MAGIC 0x534E4150
 
 // --- Connections ---
 

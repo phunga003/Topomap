@@ -1,5 +1,5 @@
 #include <pthread.h>
-#include "surveyor.h"
+#include "snapshot.h"
 #include <stdio.h>
 
 typedef struct {

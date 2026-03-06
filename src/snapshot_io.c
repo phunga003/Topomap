@@ -1,10 +1,10 @@
-#include "surveyor.h"
+#include "snapshot.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#define VERSION 1
+
 /*
  * write_snapshot_binary
  *
@@ -28,8 +28,8 @@
  *   [sizeof(UnixSocket) * unix_count]
  */
 void write_snapshot_binary(MachineSnapshot *snap) {
-    int magic = 0x534E4150;
-    int version = VERSION;
+    int magic = SNAPSHOT_MAGIC;
+    int version = SNAPSHOT_VERSION;
     write(STDOUT_FILENO, &magic, sizeof(int));
     write(STDOUT_FILENO, &version, sizeof(int));
     write(STDOUT_FILENO, &snap->identity_count, sizeof(int));

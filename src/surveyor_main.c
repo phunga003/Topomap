@@ -1,4 +1,4 @@
-#include "surveyor.h"
+#include "snapshot.h"
 #include <stdio.h>
 
 int main() {
