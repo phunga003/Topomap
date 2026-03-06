@@ -98,8 +98,10 @@ static int cmd_scan(Session *s, CommandArgs *args) {
         dispatch_scan(&target, 1);
 
         if (target.success) {
-            if (s->nodes[idx].has_snapshot)
+            if (s->nodes[idx].has_snapshot) {
+                diff_snapshots(s->nodes[idx].ip, &s->nodes[idx].snap, &target.snap);
                 free_snapshot(&s->nodes[idx].snap);
+            }
             s->nodes[idx].snap = target.snap;
             s->nodes[idx].has_snapshot = 1;
             session_save_snapshot(s, idx);
