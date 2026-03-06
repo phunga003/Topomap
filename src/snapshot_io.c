@@ -4,11 +4,13 @@
 #include <string.h>
 #include <unistd.h>
 
+#define VERSION 1
 /*
  * write_snapshot_binary
  *
  * Wire format:
  * [4 bytes magic "SNAP"]
+ * [4 bytes version]
  * [4 bytes identity_count]
  * per identity:
  *   [4 bytes pid]
@@ -27,7 +29,9 @@
  */
 void write_snapshot_binary(MachineSnapshot *snap) {
     int magic = 0x534E4150;
+    int version = VERSION;
     write(STDOUT_FILENO, &magic, sizeof(int));
+    write(STDOUT_FILENO, &version, sizeof(int));
     write(STDOUT_FILENO, &snap->identity_count, sizeof(int));
 
     for (int i = 0; i < snap->identity_count; i++) {
