@@ -12,6 +12,7 @@
  * [4 bytes identity_count]
  * per identity:
  *   [4 bytes pid]
+ *   [4 bytes ppid]
  *   [256 bytes exe]
  *   [512 bytes cmdline]
  *   [256 bytes cgroup]
@@ -19,6 +20,10 @@
  *   [sizeof(Connection) * ingress_count]
  *   [4 bytes egress_count]
  *   [sizeof(Connection) * egress_count]
+ *   [4 bytes local_count]
+ *   [sizeof(Connection) * local_count]
+ *   [4 bytes unix_count]
+ *   [sizeof(UnixSocket) * unix_count]
  */
 void write_snapshot_binary(MachineSnapshot *snap) {
     int magic = 0x534E4150;
@@ -28,6 +33,7 @@ void write_snapshot_binary(MachineSnapshot *snap) {
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
         write(STDOUT_FILENO, &id->pid, sizeof(int));
+        write(STDOUT_FILENO, &id->ppid, sizeof(int));
         write(STDOUT_FILENO, id->exe, 256);
         write(STDOUT_FILENO, id->cmdline, 512);
         write(STDOUT_FILENO, id->cgroup, 256);
@@ -42,6 +48,18 @@ void write_snapshot_binary(MachineSnapshot *snap) {
         if (id->egress_count > 0) {
             write(STDOUT_FILENO, id->egress,
                 sizeof(Connection) * id->egress_count);
+        }
+
+        write(STDOUT_FILENO, &id->local_count, sizeof(int));
+        if (id->local_count > 0) {
+            write(STDOUT_FILENO, id->local,
+                sizeof(Connection) * id->local_count);
+        }
+
+        write(STDOUT_FILENO, &id->unix_count, sizeof(int));
+        if (id->unix_count > 0) {
+            write(STDOUT_FILENO, id->unix_socks,
+                sizeof(UnixSocket) * id->unix_count);
         }
     }
 }
@@ -72,6 +90,7 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
         memset(id, 0, sizeof(Identity));
 
         if (safe_read(f, &id->pid, sizeof(int)) != 0) return -1;
+        if (safe_read(f, &id->ppid, sizeof(int)) != 0) return -1;
         if (safe_read(f, id->exe, 256) != 0) return -1;
         if (safe_read(f, id->cmdline, 512) != 0) return -1;
         if (safe_read(f, id->cgroup, 256) != 0) return -1;
@@ -89,6 +108,20 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
             if (safe_read(f, id->egress,
                 sizeof(Connection) * id->egress_count) != 0) return -1;
         }
+
+        if (safe_read(f, &id->local_count, sizeof(int)) != 0) return -1;
+        if (id->local_count > 0) {
+            id->local = malloc(sizeof(Connection) * id->local_count);
+            if (safe_read(f, id->local,
+                sizeof(Connection) * id->local_count) != 0) return -1;
+        }
+
+        if (safe_read(f, &id->unix_count, sizeof(int)) != 0) return -1;
+        if (id->unix_count > 0) {
+            id->unix_socks = malloc(sizeof(UnixSocket) * id->unix_count);
+            if (safe_read(f, id->unix_socks,
+                sizeof(UnixSocket) * id->unix_count) != 0) return -1;
+        }
     }
 
     return 0;
@@ -98,26 +131,38 @@ void print_topology(MachineSnapshot *snap) {
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
 
-        printf("=== PID:%d ===\n", id->pid);
-        printf("\tEXE:\t%s\n", id->exe);
-        printf("\tCMD:\t%s\n", id->cmdline);
-        printf("\tCGROUP:\t%s\n", id->cgroup);
+        printf("=== PID:%d PPID:%d ===\n", id->pid, id->ppid);
+        printf("  EXE:    %s\n", id->exe);
+        printf("  CMD:    %s\n", id->cmdline);
+        printf("  CGROUP: %s\n", id->cgroup);
 
         for (int j = 0; j < id->ingress_count; j++) {
             Connection *c = &id->ingress[j];
-            printf("\tINGRESS:\t%s:%u [%s state:%X]\n",
+            printf("  INGRESS: %s:%u [%s state:%X]\n",
                 c->local_addr, c->local_port,
-                c->protocol == 0 ? "tcp" : "udp",
-                c->state);
+                c->protocol == 0 ? "tcp" : "udp", c->state);
         }
 
         for (int j = 0; j < id->egress_count; j++) {
             Connection *c = &id->egress[j];
-            printf("\tEGRESS:\t%s:%u [%s state:%X]\n",
+            printf("  EGRESS:  -> %s:%u [%s state:%X]\n",
                 c->rem_addr, c->rem_port,
-                c->protocol == 0 ? "tcp" : "udp",
-                c->state);
+                c->protocol == 0 ? "tcp" : "udp", c->state);
         }
+
+        for (int j = 0; j < id->local_count; j++) {
+            Connection *c = &id->local[j];
+            printf("  LOCAL:   -> 127.0.0.1:%u [%s]\n",
+                c->rem_port,
+                c->protocol == 0 ? "tcp" : "udp");
+        }
+
+        for (int j = 0; j < id->unix_count; j++) {
+            printf("  UNIX:    %s (inode:%lu)\n",
+                id->unix_socks[j].path[0] ? id->unix_socks[j].path : "(unnamed)",
+                id->unix_socks[j].inode);
+        }
+
         printf("\n");
     }
 }
@@ -127,7 +172,12 @@ void free_snapshot(MachineSnapshot *snap) {
         free(snap->identities[i].sock_inodes);
         free(snap->identities[i].ingress);
         free(snap->identities[i].egress);
+        free(snap->identities[i].local);
+        free(snap->identities[i].unix_socks);
     }
     free(snap->identities);
     free(snap->connections);
+    free(snap->unix_sockets);
+    map_free(&snap->conn_map);
+    map_free(&snap->unix_map);
 }

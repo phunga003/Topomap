@@ -20,7 +20,9 @@ void *scan_target(void *arg) {
     ctx->user, ctx->target);
 
     FILE *stream = popen(cmd, "r");
-    if (!stream) { ctx->success = 0; return NULL; }
+    if (!stream) { 
+        ctx->success = 0; return NULL; 
+    }
 
     ctx->success = (read_snapshot(stream, &ctx->snap) == 0);
     pclose(stream);
