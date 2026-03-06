@@ -10,19 +10,14 @@
 
 #define DEFAULT_USER "root"
 
-typedef struct {
+typedef struct Session Session;
+typedef struct CommandArgs CommandArgs;
+typedef struct Command Command;
+
+typedef struct CommandArgs {
     int argc;
-    char *argv[16];
+    char *argv[16]; 
 } CommandArgs;
-
-typedef int (*CommandFn)(Session *s, CommandArgs *args);
-
-typedef struct {
-    char name[32];
-    char usage[128];
-    char help[256];
-    CommandFn fn;
-} Command;
 
 typedef struct {
     char ip[64];
@@ -31,14 +26,25 @@ typedef struct {
     int has_snapshot;
 } EnrolledNode;
 
-typedef struct {
+typedef int (*CommandFn)(Session *s, CommandArgs *args);
+
+struct Command{
+    char name[32];
+    char usage[128];
+    char help[256];
+    CommandFn fn;
+};
+
+struct Session{
     EnrolledNode nodes[MAX_NODES];
     int node_count;
     char workdir[256];
     pthread_mutex_t stdout_lock;
     Command commands[MAX_COMMANDS];
     int command_count;
-} Session;
+};
+
+
 
 
 int session_init(Session *s, const char *workdir, const char *user);

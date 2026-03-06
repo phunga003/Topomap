@@ -14,8 +14,8 @@ add_executable(surveyor
 target_include_directories(surveyor PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(surveyor -static -lpthread)
 
-# control plane binary
-add_executable(control
+# dispatcher binary
+add_executable(dispatcher
     src/control_main.c
     src/commands.c
     src/command_engine.c
@@ -27,5 +27,5 @@ add_executable(control
     src/map.c
     src/diff.c
 )
-target_include_directories(control PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(control pthread)
+target_include_directories(dispatcher PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(dispatcher pthread)

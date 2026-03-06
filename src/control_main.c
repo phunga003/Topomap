@@ -1,5 +1,6 @@
 #include "session.h"
 #include "scanner.h"
+#include "command_engine.h"
 #include <stdio.h>
 #include <string.h>
 

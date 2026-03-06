@@ -6,6 +6,7 @@
 #include "scanner.h"
 #include "command_utils.h"
 #include "map.h"
+#include "diff.h"
 
 static int cmd_list(Session *s, CommandArgs *args) {
     (void)args;
