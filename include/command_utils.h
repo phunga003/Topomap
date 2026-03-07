@@ -9,6 +9,7 @@
 const char *proto_str(int protocol);
 const char *basename_exe(const char *exe);
 const char *state_str(int state);
+const char *fmt_addr(const char *hex_addr, char *buf, int bufsize);
 
 FILE *open_output(const char *path) ;
 void close_output(FILE *out, const char *path);
@@ -18,6 +19,7 @@ void print_connection(FILE *out, Connection *c, const char *label);
 void print_unix(FILE *out, UnixSocket *sock);
 void print_identity(FILE *out, Identity *id);
 void print_node(FILE *out, EnrolledNode *node);
+void print_resolved_chains(FILE *out, Session *s, ChainList *chains);
 
 void print_attack_surface(FILE *out, Session *s);
 void print_edge_section(FILE *out, const char *title, MapEdgeList *list, int show_node);

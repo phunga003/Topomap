@@ -169,13 +169,18 @@ static int cmd_report(Session *s, CommandArgs *args) {
 
 static int cmd_map(Session *s, CommandArgs *args) {
     const char *outpath = args->argc > 1 ? args->argv[1] : NULL;
+
     FILE *out = open_output(outpath);
     if (!out) return -1;
 
     int nodes_with_data = 0;
+    int total_svc = 0;
     for (int i = 0; i < s->node_count; i++) {
-        if (s->nodes[i].has_snapshot) nodes_with_data++;
+        if (!s->nodes[i].has_snapshot) continue;
+        nodes_with_data++;
+        total_svc += s->nodes[i].snap.identity_count;
     }
+
     if (nodes_with_data == 0) {
         fprintf(stderr, "No snapshot data. Run 'scan' first.\n");
         close_output(out, outpath);
@@ -183,13 +188,8 @@ static int cmd_map(Session *s, CommandArgs *args) {
     }
 
     TopologyMap map;
-    build_topology_map(s, &map);
-
-    int total_svc = 0;
-    for (int i = 0; i < s->node_count; i++) {
-        if (s->nodes[i].has_snapshot)
-            total_svc += s->nodes[i].snap.identity_count;
-    }
+    ChainList chains;
+    build_topology_map(s, &map, &chains);
 
     fprintf(out, "==============================================================\n");
     fprintf(out, "  NETWORK TOPOLOGY MAP\n");
@@ -197,6 +197,8 @@ static int cmd_map(Session *s, CommandArgs *args) {
     fprintf(out, "==============================================================\n");
 
     print_attack_surface(out, s);
+    print_resolved_chains(out, s, &chains);
+
     print_edge_section(out, "CROSS-NODE CONNECTIONS (lateral movement paths)", &map.cross, 1);
     print_edge_section(out, "SAME-NODE CONNECTIONS", &map.local, 0);
     print_edge_section(out, "UNIX SOCKET CONNECTIONS", &map.unix_edges, 0);
@@ -207,6 +209,7 @@ static int cmd_map(Session *s, CommandArgs *args) {
 
     close_output(out, outpath);
     topology_map_free(&map);
+    chain_list_free(&chains);
     return 0;
 }
 
@@ -309,12 +312,12 @@ typedef struct {
 } CommandDef;
 
 static CommandDef commands[] = {
-    { "list",    "list",               "Show all enrolled nodes",   cmd_list },
-    { "enroll",  "enroll <ip> [user]", "Add a node for surveying",  cmd_enroll },
-    { "unenroll","unenroll <ip>",      "Remove a node",             cmd_unenroll },
-    { "scan",    "scan [ip]",          "Scan enrolled nodes",       cmd_scan },
-    { "report",  "report [ip] [file]", "Print topology report",     cmd_report },
-    { "map",     "map [file]",         "Print connection map",      cmd_map },
+    { "list",    "list",                "Show all enrolled nodes",                  cmd_list },
+    { "enroll",  "enroll <ip> [user]",  "Add a node for surveying",                 cmd_enroll },
+    { "unenroll","unenroll <ip>",       "Remove a node",                            cmd_unenroll },
+    { "scan",    "scan [ip]",           "Scan enrolled nodes",                      cmd_scan },
+    { "report",  "report [ip] [file]",  "Print topology report",                    cmd_report },
+    { "map",     "map [file]",    "Print topology map",   cmd_map },
     { "exec", "exec <ip> <bin> | exec shell <ip> <cmd>", "Execute binary or shell command on node", cmd_exec },
 };
 

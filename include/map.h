@@ -29,6 +29,27 @@ typedef struct {
     MapEdgeList unresolved;
 } TopologyMap;
 
+typedef struct {
+    Identity *source;
+    int source_node;
+    Identity *dest;
+    int dest_node;
+    Identity *proxy;
+    int proxy_node;
+    unsigned int port;
+    int protocol;
+} ResolvedChain;
+
+typedef struct {
+    ResolvedChain *chains;
+    int count;
+    int cap;
+} ChainList;
+
+void chain_list_init(ChainList *list);
+void chain_list_free(ChainList *list);
+void build_topology_map(Session *s, TopologyMap *map, ChainList *chains);
+
 void edge_list_init(MapEdgeList *list);
 void edge_list_free(MapEdgeList *list);
 void edge_list_add(MapEdgeList *list, MapEdge edge);
@@ -36,20 +57,5 @@ void edge_list_add(MapEdgeList *list, MapEdge edge);
 void topology_map_init(TopologyMap *map);
 void topology_map_free(TopologyMap *map);
 
-/*
- * build_topology_map
- *
- * Walks all enrolled nodes and resolves edges between identities.
- *
- * Current approach: For each egress connection, linear scan all nodes
- * and identities to find the matching listener. O(E * N * I) where
- * E = total egress connections, N = nodes, I = identities per node.
- *
- * Optimization path: Build a hashmap keyed on (addr, port) -> identity
- * before the edge walk. Reduces listener lookup to O(1), making the
- * overall build O(E) + O(L) where L = total listeners.
- * Same approach applies to unix socket inode matching.
- */
-void build_topology_map(Session *s, TopologyMap *map);
 
 #endif

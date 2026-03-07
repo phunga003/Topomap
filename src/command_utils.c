@@ -5,6 +5,51 @@ const char *proto_str(int protocol) {
     return protocol == 0 ? "tcp" : "udp";
 }
 
+const char *fmt_addr(const char *hex_addr, char *buf, int bufsize) {
+    int len = strlen(hex_addr);
+
+    // IPv4
+    if (len == 8) {
+        unsigned int raw;
+        sscanf(hex_addr, "%X", &raw);
+        snprintf(buf, bufsize, "%u.%u.%u.%u",
+            raw & 0xFF,
+            (raw >> 8) & 0xFF,
+            (raw >> 16) & 0xFF,
+            (raw >> 24) & 0xFF);
+        return buf;
+    }
+
+    // IPv6
+    if (len == 32) {
+        if (strncmp(hex_addr, "0000000000000000FFFF0000", 24) == 0) {
+            unsigned int raw;
+            sscanf(hex_addr + 24, "%X", &raw);
+            snprintf(buf, bufsize, "%u.%u.%u.%u",
+                raw & 0xFF,
+                (raw >> 8) & 0xFF,
+                (raw >> 16) & 0xFF,
+                (raw >> 24) & 0xFF);
+            return buf;
+        }
+
+        snprintf(buf, bufsize, "%c%c%c%c:%c%c%c%c:%c%c%c%c:%c%c%c%c:%c%c%c%c:%c%c%c%c:%c%c%c%c:%c%c%c%c",
+            hex_addr[6],hex_addr[7],hex_addr[4],hex_addr[5],
+            hex_addr[2],hex_addr[3],hex_addr[0],hex_addr[1],
+            hex_addr[14],hex_addr[15],hex_addr[12],hex_addr[13],
+            hex_addr[10],hex_addr[11],hex_addr[8],hex_addr[9],
+            hex_addr[22],hex_addr[23],hex_addr[20],hex_addr[21],
+            hex_addr[18],hex_addr[19],hex_addr[16],hex_addr[17],
+            hex_addr[30],hex_addr[31],hex_addr[28],hex_addr[29],
+            hex_addr[26],hex_addr[27],hex_addr[24],hex_addr[25]);
+        return buf;
+    }
+
+    // fallback: return as-is
+    snprintf(buf, bufsize, "%s", hex_addr);
+    return buf;
+}
+
 const char *basename_exe(const char *exe) {
     const char *slash = strrchr(exe, '/');
     return slash ? slash + 1 : exe;
@@ -39,12 +84,17 @@ void print_separator(FILE *out) {
 }
 
 void print_connection(FILE *out, Connection *c, const char *label) {
+    char local[64], remote[64];
+
     if (c->state == 0x0A) {
-        fprintf(out, "    %-8s :%u/%s\n", label, c->local_port, proto_str(c->protocol));
+        fprintf(out, "    %-8s %s:%u/%s\n", label,
+            fmt_addr(c->local_addr, local, sizeof(local)),
+            c->local_port, proto_str(c->protocol));
         return;
     }
-    fprintf(out, "    %-8s -> %s:%u/%s %s\n", label,
-        c->rem_addr, c->rem_port,
+    fprintf(out, "    %-8s %s:%u -> %s:%u/%s %s\n", label,
+        fmt_addr(c->local_addr, local, sizeof(local)), c->local_port,
+        fmt_addr(c->rem_addr, remote, sizeof(remote)), c->rem_port,
         proto_str(c->protocol), state_str(c->state));
 }
 
@@ -133,6 +183,26 @@ void print_edge_section(FILE *out, const char *title, MapEdgeList *list, int sho
     }
 }
 
+void print_resolved_chains(FILE *out, Session *s, ChainList *chains) {
+    if (chains->count == 0) return;
+
+    fprintf(out, "\n  RESOLVED SERVICE PATHS (proxy chains collapsed)\n");
+    print_separator(out);
+
+    for (int i = 0; i < chains->count; i++) {
+        ResolvedChain *c = &chains->chains[i];
+
+        fprintf(out, "  %s/%-20s ---:%u/%s--> %s/%-20s  (via %s)\n",
+            s->nodes[c->source_node].ip,
+            basename_exe(c->source->exe),
+            c->port,
+            proto_str(c->protocol),
+            s->nodes[c->dest_node].ip,
+            basename_exe(c->dest->exe),
+            basename_exe(c->proxy->exe));
+    }
+}
+
 void print_hardening_checklist(FILE *out, Session *s,
                                 MapEdgeList *cross, MapEdgeList *unresolved) {
     fprintf(out, "\n  HARDENING CHECKLIST\n");
@@ -174,7 +244,7 @@ void print_hardening_checklist(FILE *out, Session *s,
     }
 
     if (unresolved->count > 0) {
-        fprintf(out, "\n  UNKNOWN DESTINATIONS (investigate immediately):\n");
+        fprintf(out, "\n  UNKNOWN DESTINATIONS:\n");
         for (int i = 0; i < unresolved->count; i++) {
             MapEdge *e = &unresolved->edges[i];
             fprintf(out, "    %s/%-20s -> %s\n",
