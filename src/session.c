@@ -35,7 +35,12 @@ int session_init(Session *s, const char *workdir) {
 
     if (ensure_workdir(s->workdir) != 0) return -1;
 
-    return session_load_all(s);
+    // NOTE: preregistering nodes based on existing 
+    // snap files are not working at the moment
+
+    // return session_load_all(s);
+
+    return 0;
 }
 
 void session_destroy(Session *s) {
