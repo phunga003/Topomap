@@ -52,8 +52,6 @@ Determining which process owns which connections id done with the help of a hash
 
 **Interactive control plane.** A REPL lets you enroll nodes, run scans, view reports, inspect the topology map, and execute shell commands on remote machines. Adding new commands is declarative: define a name, a function pointer, and a help string.
 
-**Persistent sessions.** Snapshots are saved to disk in binary format. When you restart Topomap, it reloads all previous snapshots and re enrolls the nodes automatically. Unenrolling a node dumps a final human readable report to the work directory before removing it.
-
 **Remote execution.** Push and execute binaries on target machines using the same transport as the scanner. Or run shell commands directly. Both go through the established SSH key infrastructure with scoped sudo permissions.
 
 ## Dependencies
