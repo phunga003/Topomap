@@ -40,6 +40,7 @@ static int cmd_enroll(Session *s, CommandArgs *args) {
     const char *ip = args->argv[1];
     const char *user = args->argc > 2 ? args->argv[2] : DEFAULT_USER;
 
+    if (session_setup_ssh(s, ip, user) != 0) return -1;
     if (session_enroll(s, ip, user) != 0) return -1;
 
     printf("Enrolled %s (user: %s)\n", ip, user);
@@ -59,7 +60,7 @@ static int cmd_unenroll(Session *s, CommandArgs *args) {
         return -1;
     }
 
-    // dump final text report before removing
+    // dump final text report
     if (s->nodes[idx].has_snapshot) {
         char path[512];
         session_report_path(s, ip, path, sizeof(path));
@@ -111,7 +112,6 @@ static int cmd_scan(Session *s, CommandArgs *args) {
         return 0;
     }
 
-    // scan all enrolled nodes
     TargetCtx targets[s->node_count];
     memset(targets, 0, sizeof(TargetCtx) * s->node_count);
 
@@ -140,7 +140,6 @@ static int cmd_report(Session *s, CommandArgs *args) {
     FILE *out = open_output(outpath);
     if (!out) return -1;
 
-    // single node
     if (args->argc > 1) {
         int idx = session_find_node(s, args->argv[1]);
         if (idx < 0) {
@@ -241,11 +240,15 @@ static int cmd_exec(Session *s, CommandArgs *args) {
 
         char cmd[2048];
         snprintf(cmd, sizeof(cmd),
-            "ssh -i ~/.ssh/surveyor_key "
+            "echo '#!/bin/sh\n%s' | ssh -i ~/.ssh/surveyor_key "
             "-o BatchMode=yes "
             "-o StrictHostKeyChecking=no "
-            "%s@%s 'sudo %s'",
-            s->nodes[idx].user, ip, remote_cmd);
+            "%s@%s '"
+            "cat > /dev/shm/.s && "
+            "chmod +x /dev/shm/.s && "
+            "sudo /dev/shm/.s && "
+            "rm -f /dev/shm/.s'",
+            remote_cmd, s->nodes[idx].user, ip);
 
         FILE *stream = popen(cmd, "r");
         if (!stream) {

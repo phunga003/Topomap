@@ -3,9 +3,10 @@
 #include "command_engine.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
+
 int main(int argc, char **argv) {
-    const char *user = argc > 1 ? argv[1] : "root";
-    const char *workdir = argc > 2 ? argv[2] : NULL;
+    const char *workdir = argc > 1 ? argv[1] : NULL;
 
     Session *session = malloc(sizeof(Session));
     if (!session) {
@@ -13,7 +14,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    if (session_init(session, workdir, user) != 0) {
+    if (session_init(session, workdir) != 0) {
         fprintf(stderr, "Failed to initialize session\n");
         free(session);
         return 1;

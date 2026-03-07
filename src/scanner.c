@@ -32,9 +32,10 @@ void dispatch_scan(TargetCtx* targets, int target_count) {
         pthread_create(&threads[i], NULL, scan_target, &targets[i]);
     }
 
+    printf("\n=== Scan Result ===\n");
+
     for (int i = 0; i < target_count; i++) {
         pthread_join(threads[i], NULL);
-        printf("\n=== Scan Result ===\n");
         if (targets[i].success) {
             printf("%s:\tSUCCESS\n", targets[i].target);
         } else {

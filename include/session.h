@@ -47,10 +47,11 @@ struct Session{
 
 
 
-int session_init(Session *s, const char *workdir, const char *user);
+int session_init(Session *s, const char *workdir);
 void register_commands(Session *s);
 void session_destroy(Session *s);
 
+int session_setup_ssh(Session *s, const char *ip, const char *user);
 int session_enroll(Session *s, const char *ip, const char *user);
 int session_unenroll(Session *s, const char *ip);
 int session_find_node(Session *s, const char *ip);
