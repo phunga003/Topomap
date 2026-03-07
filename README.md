@@ -116,7 +116,9 @@ surveyor> help                        # list all commands
 
 **No external dependencies.** Everything is built from scratch in C using POSIX interfaces and the `/proc` filesystem.
 
-**Speed.** Hash maps for O(1) lookups, thread pools for parallel scanning, linked list collection with single allocation flattening. The goal is to get answers in seconds during situations where seconds matter.
+**Speed.** Hash maps for O(1) lookups, thread pools for parallel scanning, linked list collection with single allocation flattening. The goal is to get answers fast during critical situations.
+
+**Lightweight.** The scanner binary is designed to run without impacting the target machine's performance. The current implementation uses hashmaps for speed, but I am exploring alternatives that are both time and space efficient.
 
 **Readable output.** Reports are structured for quick scanning: attack surface first, then connections by priority (cross node, same node, loopback, unix socket), then unresolved unknowns, then a concrete hardening checklist.
 
