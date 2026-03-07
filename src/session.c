@@ -162,8 +162,8 @@ int session_save_snapshot(Session *s, int node_idx) {
     }
 
     MachineSnapshot *snap = &node->snap;
-    int magic = 0x534E4150;
-    int version = 1;
+    int magic = SNAPSHOT_MAGIC;
+    int version = SNAPSHOT_VERSION;
     fwrite(&magic, sizeof(int), 1, f);
     fwrite(&version, sizeof(int), 1, f);
     fwrite(&snap->identity_count, sizeof(int), 1, f);
