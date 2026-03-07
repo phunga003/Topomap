@@ -38,7 +38,7 @@ Linux processes are files. Everything about a running process, its binary, its c
 4. The binary is deleted from the target immediately after execution. It runs from /dev/shm so it never touches disk.
 5. On the control machine, snapshots from all nodes are cross referenced to resolve the full service topology: which process on which machine talks to which process on which other machine, through which ports.
 
-A hashmap is used to help determine which process owns which connections. Process scanning is parallelized across threads. Network file reads (tcp, udp, tcp6, udp6, unix) run concurrently.
+Determining which process owns which connections id done with the help of a hashmap. Process scanning is parallelized across threads. Network file reads (tcp, udp, tcp6, udp6, unix) run concurrently.
 
 ## Features
 
@@ -94,7 +94,6 @@ surveyor> scan 10.0.0.1               # scan one node
 surveyor> report                      # print all node reports
 surveyor> report 10.0.0.1 out.txt     # save report to file
 surveyor> map                         # print full topology map
-surveyor> map raw                     # topology without proxy collapsing
 surveyor> exec shell 10.0.0.1 ss -tnp # run a command on a node
 surveyor> enroll 10.0.0.4 admin       # add a new node
 surveyor> unenroll 10.0.0.2           # remove a node
