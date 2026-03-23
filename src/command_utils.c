@@ -104,8 +104,9 @@ void print_unix_sock(FILE *out, UnixSocket *sock) {
         sock->inode);
 }
 
-static void fprintf_utc(FILE *out, long *starttime){
-    struct tm *tm = gmtime(starttime);
+void fprintf_utc(FILE *out, uint64_t starttime){
+    time_t t = (time_t)starttime;
+    struct tm *tm = gmtime(&t);
     char buf[64];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", tm);
     fprintf(out, "  START_TIME:\t%s\n", buf);
@@ -115,7 +116,7 @@ void print_identity(FILE *out, Identity *id) {
     fprintf(out, "  PID:%-8d PPID:%-8d EXE:%s\n", id->pid, id->ppid, id->exe);
     fprintf(out, "  CMD: %s\n", id->cmdline);
     fprintf(out, "  LOGINUID: %u%s\n", id->loginuid, id->loginuid == 0xFFFFFFFF ? " (unset)" : id->loginuid < 1000 ? " (system)" : "");
-    fprintf_utc(out, &id->starttime);
+    fprintf_utc(out, id->starttime);
     if (strlen(id->cgroup) > 1)
         fprintf(out, "  CGROUP: %s\n", id->cgroup);
 

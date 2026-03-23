@@ -16,8 +16,9 @@ FILE *open_output(const char *path) ;
 void close_output(FILE *out, const char *path);
 
 void print_separator(FILE *out);
+void fprintf_utc(FILE *out, uint64_t starttime);
 void print_connection(FILE *out, Connection *c, const char *label);
-void print_unix(FILE *out, UnixSocket *sock);
+void print_unix_sock(FILE *out, UnixSocket *sock);
 void print_identity(FILE *out, Identity *id);
 void print_node(FILE *out, EnrolledNode *node);
 void print_resolved_chains(FILE *out, Session *s, ChainList *chains);

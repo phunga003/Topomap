@@ -252,7 +252,7 @@ static void read_ppid_and_starttime(int pid, int *ppid, uint64_t *starttime, uin
         "%*d %*d %*d "  // 14-16: utime, stime, cutime
         "%*d %*d %*d "  // 17-19: cstime, priority, nice
         "%*d %*d "      // 20-21: num_threads, itrealvalue
-        "%llu",         // 22: starttime
+        "%lu",         // 22: starttime
         ppid, &raw_starttime
     );
 
@@ -266,7 +266,7 @@ static uint64_t read_btime(void) {
     if (f) {
         char line[64];
         while (fgets(line, sizeof(line), f))
-            if (sscanf(line, "btime %llu", &btime) == 1) break;
+            if (sscanf(line, "btime %lu", &btime) == 1) break;
         fclose(f);
     }
     return btime;
@@ -290,7 +290,7 @@ static int collect_socket_inodes(int pid, unsigned long *inodes, int max) {
         if (n < 0) continue;
         target[n] = '\0';
 
-        unsigned long inode;
+        uint64_t inode;
         if (sscanf(target, "socket:[%lu]", &inode) == 1) {
             inodes[count++] = inode;
         }
@@ -304,9 +304,9 @@ typedef struct {
     int pid_count;
     int worker_id;
     int num_workers;
-    Identity *identities;   // pre-allocated, each worker writes to its own slots
-    int *identity_count;     // per-worker count
-    unsigned long long btime;
+    Identity *identities;  
+    int *identity_count;   
+    uint64_t btime;
 } PidWorkerCtx;
 
 static void *pid_worker(void *arg) {
@@ -315,7 +315,7 @@ static void *pid_worker(void *arg) {
 
     for (int i = ctx->worker_id; i < ctx->pid_count; i += ctx->num_workers) {
         int pid = ctx->pids[i];
-        unsigned long inodes[MAX_INODES];
+        uint64_t inodes[MAX_INODES];
         int inode_count = collect_socket_inodes(pid, inodes, MAX_INODES);
 
         if (inode_count == 0) continue;

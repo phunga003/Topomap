@@ -2,6 +2,7 @@
 #ifndef SCANNER_H
 #define SCANNER_H
 #include "snapshot.h"
+#include "snapshot_io.h"
 
 typedef struct {
     char *target;

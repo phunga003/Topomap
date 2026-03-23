@@ -10,6 +10,8 @@ add_executable(surveyor
     src/surveyor.c
     src/hashmap.c
     src/snapshot_io.c
+    src/wire.c
+    src/schemas.c
 )
 target_include_directories(surveyor PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(surveyor -static -lpthread)
@@ -26,6 +28,8 @@ add_executable(dispatcher
     src/hashmap.c
     src/map.c
     src/diff.c
+    src/wire.c
+    src/schemas.c
 )
 target_include_directories(dispatcher PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(dispatcher pthread)

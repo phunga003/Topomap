@@ -1,65 +1,37 @@
-#include "snapshot.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <time.h>
-/*
- * write_snapshot_binary
- *
- * Wire format:
- * [4 bytes magic "SNAP"]
- * [4 bytes version]
- * [4 bytes identity_count]
- * per identity:
- *   [4 bytes pid]
- *   [4 bytes ppid]
- *   [4 bytes loginuid]
- *   [8 bytes starttime]
- *   [256 bytes exe]
- *   [512 bytes cmdline]
- *   [256 bytes cgroup]
- *   [4 bytes ingress_count]
- *   [sizeof(Connection) * ingress_count]
- *   [4 bytes egress_count]
- *   [sizeof(Connection) * egress_count]
- *   [4 bytes local_count]
- *   [sizeof(Connection) * local_count]
- *   [4 bytes unix_count]
- *   [sizeof(UnixSocket) * unix_count]
- */
+#include "snapshot_io.h"
+
+#define WRITE_ARRAY(f, arr, count, schema, schema_count) do {       \
+    fwrite(&(count), sizeof(int), 1, f);                            \
+    for (int _j = 0; _j < (count); _j++)                           \
+        wire_write(f, &(arr)[_j], schema, schema_count);            \
+} while (0)
+
+#define READ_ARRAY(f, arr, count, type, schema, schema_count) do {  \
+    if (safe_read(f, &(count), sizeof(int)) != 0) goto fail;        \
+    if ((count) > 0) {                                              \
+        (arr) = malloc(sizeof(type) * (count));                     \
+        if (!(arr)) goto fail;                                      \
+        for (int _j = 0; _j < (count); _j++)                       \
+            if (wire_read(f, &(arr)[_j], schema, schema_count) != 0) goto fail; \
+    }                                                               \
+} while (0)
+
+
 int write_snapshot(FILE *f, MachineSnapshot *snap) {
     int magic = SNAPSHOT_MAGIC;
     int version = SNAPSHOT_VERSION;
-    fwrite(&magic, sizeof(int), 1, f);
-    fwrite(&version, sizeof(int), 1, f);
+    fwrite(&magic,               sizeof(int), 1, f);
+    fwrite(&version,             sizeof(int), 1, f);
     fwrite(&snap->identity_count, sizeof(int), 1, f);
 
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
-        fwrite(&id->pid, sizeof(int), 1, f);
-        fwrite(&id->ppid, sizeof(int), 1, f);
-        fwrite(&id->loginuid, sizeof(unsigned int), 1, f);
-        fwrite(&id->starttime, sizeof(uint64_t), 1, f);
-        fwrite(id->exe, 256, 1, f);
-        fwrite(id->cmdline, 512, 1, f);
-        fwrite(id->cgroup, 256, 1, f);
+        wire_write(f, id, identity_schema, identity_schema_count);
 
-        fwrite(&id->ingress_count, sizeof(int), 1, f);
-        if (id->ingress_count > 0)
-            fwrite(id->ingress, sizeof(Connection), id->ingress_count, f);
-
-        fwrite(&id->egress_count, sizeof(int), 1, f);
-        if (id->egress_count > 0)
-            fwrite(id->egress, sizeof(Connection), id->egress_count, f);
-
-        fwrite(&id->local_count, sizeof(int), 1, f);
-        if (id->local_count > 0)
-            fwrite(id->local, sizeof(Connection), id->local_count, f);
-
-        fwrite(&id->unix_count, sizeof(int), 1, f);
-        if (id->unix_count > 0)
-            fwrite(id->unix_socks, sizeof(UnixSocket), id->unix_count, f);
+        WRITE_ARRAY(f, id->ingress,    id->ingress_count, connection_schema,    connection_schema_count);
+        WRITE_ARRAY(f, id->egress,     id->egress_count,  connection_schema,    connection_schema_count);
+        WRITE_ARRAY(f, id->local,      id->local_count,   connection_schema,    connection_schema_count);
+        WRITE_ARRAY(f, id->unix_socks, id->unix_count,    unix_socket_schema,   unix_socket_schema_count);
     }
 
     return 0;
@@ -69,7 +41,7 @@ void write_snapshot_binary(MachineSnapshot *snap) {
     write_snapshot(stdout, snap);
 }
 
-static int safe_read(FILE *f, void *buf, size_t len) {
+int safe_read(FILE *f, void *buf, size_t len) {
     size_t n = fread(buf, 1, len, f);
     if (n != len) return -1;
     return 0;
@@ -84,75 +56,38 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
         fprintf(stderr, "Bad magic: %X\n", magic);
         return -1;
     }
+
     int version;
     if (safe_read(f, &version, sizeof(int)) != 0) return -1;
-    if (version != SNAPSHOT_VERSION) return -1; 
-    
+    if (version != SNAPSHOT_VERSION) return -1;
+
     if (safe_read(f, &snap->identity_count, sizeof(int)) != 0) return -1;
     if (snap->identity_count <= 0 || snap->identity_count > MAX_IDENTITIES) return -1;
 
     snap->identities = malloc(sizeof(Identity) * snap->identity_count);
     if (!snap->identities) return -1;
-
     // zero all entries upfront so free_snapshot is safe on partial reads
-    memset(snap->identities, 0, sizeof(Identity) * snap->identity_count); 
+    memset(snap->identities, 0, sizeof(Identity) * snap->identity_count);
 
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
-        memset(id, 0, sizeof(Identity));
 
-        if (safe_read(f, &id->pid, sizeof(int)) != 0) goto fail;
-        if (safe_read(f, &id->ppid, sizeof(int)) != 0) goto fail;
-        if (safe_read(f, &id->loginuid, sizeof(unsigned int)) != 0) goto fail;
-        if (safe_read(f, &id->starttime, sizeof(unsigned long)) != 0) goto fail;
-        if (safe_read(f, id->exe, 256) != 0) goto fail;
-        if (safe_read(f, id->cmdline, 512) != 0) goto fail;
-        if (safe_read(f, id->cgroup, 256) != 0) goto fail;
+        if (wire_read(f, id, identity_schema, identity_schema_count) != 0) goto fail;
 
-        if (safe_read(f, &id->ingress_count, sizeof(int)) != 0) goto fail;
-        if (id->ingress_count > 0) {
-            id->ingress = malloc(sizeof(Connection) * id->ingress_count);
-            if (!id->ingress) goto fail;
-            if (safe_read(f, id->ingress, sizeof(Connection) * id->ingress_count) != 0) goto fail;
-        }
-
-        if (safe_read(f, &id->egress_count, sizeof(int)) != 0) goto fail;
-        if (id->egress_count > 0) {
-            id->egress = malloc(sizeof(Connection) * id->egress_count);
-            if (!id->egress) goto fail;
-            if (safe_read(f, id->egress, sizeof(Connection) * id->egress_count) != 0) goto fail;
-        }
-
-        if (safe_read(f, &id->local_count, sizeof(int)) != 0) goto fail;
-        if (id->local_count > 0) {
-            id->local = malloc(sizeof(Connection) * id->local_count);
-            if (!id->local) goto fail;
-            if (safe_read(f, id->local, sizeof(Connection) * id->local_count) != 0) goto fail;
-        }
-
-        if (safe_read(f, &id->unix_count, sizeof(int)) != 0) goto fail;
-        if (id->unix_count > 0) {
-            id->unix_socks = malloc(sizeof(UnixSocket) * id->unix_count);
-            if (!id->unix_socks) goto fail;
-            if (safe_read(f, id->unix_socks, sizeof(UnixSocket) * id->unix_count) != 0) goto fail;
-        }
+        READ_ARRAY(f, id->ingress,    id->ingress_count, Connection,  connection_schema,  connection_schema_count);
+        READ_ARRAY(f, id->egress,     id->egress_count,  Connection,  connection_schema,  connection_schema_count);
+        READ_ARRAY(f, id->local,      id->local_count,   Connection,  connection_schema,  connection_schema_count);
+        READ_ARRAY(f, id->unix_socks, id->unix_count,    UnixSocket,  unix_socket_schema, unix_socket_schema_count);
     }
 
     return 0;
 
-    fail:
-        free_snapshot(snap);
-        return -1;
+fail:
+    free_snapshot(snap);
+    return -1;
 }
 
-static void print_utc(uint64_t starttime) {
-    time_t t = (time_t)starttime;
-    struct tm *tm = gmtime(&t);
-    char buf[64];
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", tm);
-    printf("  START_TIME:\t%s\n", buf);
-}
-
+// For surveyor debug
 void print_topology(MachineSnapshot *snap) {
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
@@ -161,7 +96,7 @@ void print_topology(MachineSnapshot *snap) {
         printf("  EXE:\t%s\n", id->exe);
         printf("  CMD:\t%s\n", id->cmdline);
         printf("  CGROUP:\t%s\n", id->cgroup);
-        print_utc(id->starttime);
+        fprintf_utc(stdout, id->starttime);
         printf("  LOGINUID:\t%u\n", id->loginuid);
 
         for (int j = 0; j < id->ingress_count; j++) {

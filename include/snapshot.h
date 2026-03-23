@@ -19,11 +19,11 @@ typedef struct {
     unsigned int rem_port;
     int state;
     int protocol;       // 0=tcp, 1=udp
-    unsigned long inode;
+    uint64_t inode;
 } Connection;
 
 typedef struct {
-    unsigned long inode;
+    uint64_t inode;
     char path[256];
 } UnixSocket;
 
@@ -47,7 +47,7 @@ typedef struct {
     UnixSocket *unix_socks;
     int unix_count;
 
-    unsigned long *sock_inodes;
+    uint64_t *sock_inodes;
     int inode_count;
 } Identity;
 
@@ -64,11 +64,10 @@ typedef struct {
     int identity_count;
 } MachineSnapshot;
 
+
 int snapshot_machine(MachineSnapshot *snap);
-int write_snapshot(FILE *f, MachineSnapshot *snap);
-void write_snapshot_binary(MachineSnapshot *snap);
-int read_snapshot(FILE *f, MachineSnapshot *snap);
-void print_topology(MachineSnapshot *snap);
 void free_snapshot(MachineSnapshot *snap);
+
+
 
 #endif

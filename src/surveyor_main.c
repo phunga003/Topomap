@@ -1,4 +1,5 @@
 #include "snapshot.h"
+#include "snapshot_io.h"
 #include <stdio.h>
 
 int main() {

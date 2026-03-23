@@ -1,14 +1,4 @@
 #include "session.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <errno.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <arpa/inet.h>
-#include <assert.h>
 
 
 void session_snapshot_path(Session *s, const char *ip, char *buf, int bufsize) {
@@ -222,7 +212,6 @@ int session_load_node_records(Session *s) {
 }
 
 int session_load_all(Session *s) {
-    assert(s->node_count >= 0 && s->node_count <= MAX_NODES);
     DIR *d = opendir(s->workdir);
     if (!d) return 0;
 
