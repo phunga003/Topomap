@@ -23,10 +23,11 @@ typedef struct {
     int dropped_unix;
 } DiffStats;
 
-static void diff_conn_list(const char *label, 
-                           Connection *old_snap, int old_snap_count,
-                           Connection *new_snap, int new_snap_count,
-                           DiffStats *stats) {
+static void diff_conn_list( FILE *out,
+                            const char *label, 
+                            Connection *old_snap, int old_snap_count,
+                            Connection *new_snap, int new_snap_count,
+                            DiffStats *stats) {
     // new_snap connections
     for (int i = 0; i < new_snap_count; i++) {
         int found = 0;
@@ -34,7 +35,7 @@ static void diff_conn_list(const char *label,
             if (conn_match(&new_snap[i], &old_snap[j])) { found = 1; break; }
         }
         if (!found) {
-            printf("  + %s :%u/%s -> %s:%u %s\n", label,
+            fprintf(out, "  + %s :%u/%s -> %s:%u %s\n", label,
                 new_snap[i].local_port, proto_str(new_snap[i].protocol),
                 new_snap[i].rem_addr, new_snap[i].rem_port,
                 state_str(new_snap[i].state));
@@ -49,7 +50,7 @@ static void diff_conn_list(const char *label,
             if (conn_match(&old_snap[i], &new_snap[j])) { found = 1; break; }
         }
         if (!found) {
-            printf("  - %s :%u/%s -> %s:%u %s\n", label,
+            fprintf(out, "  - %s :%u/%s -> %s:%u %s\n", label,
                 old_snap[i].local_port, proto_str(old_snap[i].protocol),
                 old_snap[i].rem_addr, old_snap[i].rem_port,
                 state_str(old_snap[i].state));
@@ -62,7 +63,7 @@ static void diff_conn_list(const char *label,
         for (int j = 0; j < old_snap_count; j++) {
             if (!conn_match(&new_snap[i], &old_snap[j])) continue;
             if (new_snap[i].state != old_snap[j].state) {
-                printf("  ~ %s :%u/%s -> %s:%u %s => %s\n", label,
+                fprintf(out, "  ~ %s :%u/%s -> %s:%u %s => %s\n", label,
                     new_snap[i].local_port, proto_str(new_snap[i].protocol),
                     new_snap[i].rem_addr, new_snap[i].rem_port,
                     state_str(old_snap[j].state), state_str(new_snap[i].state));
@@ -73,16 +74,17 @@ static void diff_conn_list(const char *label,
     }
 }
 
-static void diff_unix_list(UnixSocket *old_snap, int old_snap_count,
-                           UnixSocket *new_snap, int new_snap_count,
-                           DiffStats *stats) {
+static void diff_unix_list( FILE *out,
+                            UnixSocket *old_snap, int old_snap_count,
+                            UnixSocket *new_snap, int new_snap_count,
+                            DiffStats *stats) {
     for (int i = 0; i < new_snap_count; i++) {
         int found = 0;
         for (int j = 0; j < old_snap_count; j++) {
             if (unix_match(&new_snap[i], &old_snap[j])) { found = 1; break; }
         }
         if (!found) {
-            printf("  + UNIX %s (inode:%lu)\n",
+            fprintf(out, "  + UNIX %s (inode:%lu)\n",
                 new_snap[i].path[0] ? new_snap[i].path : "(unnamed)",
                 new_snap[i].inode);
             stats->new_snap_unix++;
@@ -95,7 +97,7 @@ static void diff_unix_list(UnixSocket *old_snap, int old_snap_count,
             if (unix_match(&old_snap[i], &new_snap[j])) { found = 1; break; }
         }
         if (!found) {
-            printf("  - UNIX %s (inode:%lu)\n",
+            fprintf(out, "  - UNIX %s (inode:%lu)\n",
                 old_snap[i].path[0] ? old_snap[i].path : "(unnamed)",
                 old_snap[i].inode);
             stats->dropped_unix++;
@@ -103,35 +105,38 @@ static void diff_unix_list(UnixSocket *old_snap, int old_snap_count,
     }
 }
 
-void diff_snapshots(const char *ip, MachineSnapshot *old_snap, MachineSnapshot *new_snap) {
+void diff_snapshots(FILE *out, const char *ip, MachineSnapshot *old_snap, MachineSnapshot *new_snap) {
     DiffStats stats = {0};
 
     for (int i = 0; i < new_snap->identity_count; i++) {
         Identity *nid = &new_snap->identities[i];
 
-        // find matching old_snap identity by exe
+        // find matching old_snap identity by exe, loginuid, and starttime
         Identity *oid = NULL;
         for (int j = 0; j < old_snap->identity_count; j++) {
-            if (strcmp(old_snap->identities[j].exe, nid->exe) == 0) {
+            if (strcmp(old_snap->identities[j].exe, nid->exe) == 0 
+                && old_snap->identities[j].loginuid == nid->loginuid
+                && old_snap->identities[j].starttime == nid->starttime) 
+            {
                 oid = &old_snap->identities[j];
                 break;
             }
         }
 
         if (!oid) {
-            printf("  + new_snap SERVICE %s (PID:%d)\n", basename_exe(nid->exe), nid->pid);
+            fprintf(out, "  + new_snap SERVICE %s (PID:%d)\n", basename_exe(nid->exe), nid->pid);
             stats.new_snap_conn += nid->ingress_count + nid->egress_count + nid->local_count;
             stats.new_snap_unix += nid->unix_count;
             continue;
         }
 
-        diff_conn_list("INGRESS", oid->ingress, oid->ingress_count,
+        diff_conn_list(out, "INGRESS", oid->ingress, oid->ingress_count,
                        nid->ingress, nid->ingress_count, &stats);
-        diff_conn_list("EGRESS", oid->egress, oid->egress_count,
+        diff_conn_list(out, "EGRESS", oid->egress, oid->egress_count,
                        nid->egress, nid->egress_count, &stats);
-        diff_conn_list("LOCAL", oid->local, oid->local_count,
+        diff_conn_list(out, "LOCAL", oid->local, oid->local_count,
                        nid->local, nid->local_count, &stats);
-        diff_unix_list(oid->unix_socks, oid->unix_count,
+        diff_unix_list(out, oid->unix_socks, oid->unix_count,
                        nid->unix_socks, nid->unix_count, &stats);
     }
 
@@ -145,7 +150,7 @@ void diff_snapshots(const char *ip, MachineSnapshot *old_snap, MachineSnapshot *
             }
         }
         if (!found) {
-            printf("  - SERVICE DOWN %s (was PID:%d)\n",
+            fprintf(out, "  - SERVICE DOWN %s (was PID:%d)\n",
                 basename_exe(old_snap->identities[i].exe),
                 old_snap->identities[i].pid);
             stats.dropped_conn += old_snap->identities[i].ingress_count +
@@ -160,6 +165,7 @@ void diff_snapshots(const char *ip, MachineSnapshot *old_snap, MachineSnapshot *
 
     if (total == 0) {
         printf("  [%s] no changes\n", ip);
+        fprintf(out, "  no changes\n");
     } else {
         printf("  [%s] +%d -%d ~%d\n", ip,
             stats.new_snap_conn + stats.new_snap_unix,

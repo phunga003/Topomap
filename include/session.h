@@ -62,5 +62,6 @@ int session_load_all(Session *s);
 
 void session_snapshot_path(Session *s, const char *ip, char *buf, int bufsize);
 void session_report_path(Session *s, const char *ip, char *buf, int bufsize);
+void session_diff_path(Session *s, const char *ip, char *buf, int bufsize);
 
 #endif

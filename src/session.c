@@ -14,6 +14,10 @@ void session_snapshot_path(Session *s, const char *ip, char *buf, int bufsize) {
     snprintf(buf, bufsize, "%s/%s.snap", s->workdir, ip);
 }
 
+void session_diff_path(Session *s, const char *ip, char *buf, int bufsize) {
+    snprintf(buf, bufsize, "%s/%s.diff.txt", s->workdir, ip);
+}
+
 void session_report_path(Session *s, const char *ip, char *buf, int bufsize) {
     snprintf(buf, bufsize, "%s/%s.report.txt", s->workdir, ip);
 }

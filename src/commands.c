@@ -77,13 +77,25 @@ static int cmd_unenroll(Session *s, CommandArgs *args) {
     return 0;
 }
 
+static FILE *start_scan_report(Session *s, const char *ip){
+    char out_path[512];
+    session_diff_path(s, ip, out_path, sizeof(out_path));
+
+    FILE *out = fopen(out_path, "a");
+    if (!out) { perror("fopen"); return stdout; }
+
+    time_t now = time(NULL);
+    fprintf(out, "[SCAN] %s", ctime(&now));
+
+    return out;
+}
+
 static int cmd_scan(Session *s, CommandArgs *args) {
     if (s->node_count == 0) {
         fprintf(stderr, "No nodes enrolled\n");
         return -1;
     }
 
-    // scan single node
     if (args->argc > 1) {
         int idx = session_find_node(s, args->argv[1]);
         if (idx < 0) {
@@ -101,8 +113,9 @@ static int cmd_scan(Session *s, CommandArgs *args) {
 
         if (target.success) {
             if (s->nodes[idx].has_snapshot) {
-                // TODO: Save diff before overwrite.
-                diff_snapshots(s->nodes[idx].ip, &s->nodes[idx].snap, &target.snap);
+                FILE *out = start_scan_report(s, s->nodes[idx].ip);
+                diff_snapshots(out, s->nodes[idx].ip, &s->nodes[idx].snap, &target.snap);
+                fclose(out);
                 free_snapshot(&s->nodes[idx].snap);
             }
             s->nodes[idx].snap = target.snap;
@@ -125,9 +138,12 @@ static int cmd_scan(Session *s, CommandArgs *args) {
 
     for (int i = 0; i < s->node_count; i++) {
         if (!targets[i].success) continue;
-
-        if (s->nodes[i].has_snapshot)
+        if (s->nodes[i].has_snapshot) {
+            FILE *out = start_scan_report(s, s->nodes[i].ip);
+            diff_snapshots(out, s->nodes[i].ip, &s->nodes[i].snap, &targets[i].snap);
+            fclose(out);
             free_snapshot(&s->nodes[i].snap);
+        }
         s->nodes[i].snap = targets[i].snap;
         s->nodes[i].has_snapshot = 1;
         session_save_snapshot(s, i);
