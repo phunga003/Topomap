@@ -161,43 +161,10 @@ int session_save_snapshot(Session *s, int node_idx) {
     session_snapshot_path(s, node->ip, path, sizeof(path));
 
     FILE *f = fopen(path, "wb");
-    if (!f) {
-        perror("save snapshot");
-        return -1;
-    }
+    if (!f) { perror("save snapshot"); return -1; }
 
-    MachineSnapshot *snap = &node->snap;
-    int magic = SNAPSHOT_MAGIC;
-    int version = SNAPSHOT_VERSION;
-    fwrite(&magic, sizeof(int), 1, f);
-    fwrite(&version, sizeof(int), 1, f);
-    fwrite(&snap->identity_count, sizeof(int), 1, f);
-
-    for (int i = 0; i < snap->identity_count; i++) {
-        Identity *id = &snap->identities[i];
-        fwrite(&id->pid, sizeof(int), 1, f);
-        fwrite(&id->ppid, sizeof(int), 1, f);
-        fwrite(id->exe, 256, 1, f);
-        fwrite(id->cmdline, 512, 1, f);
-        fwrite(id->cgroup, 256, 1, f);
-
-        fwrite(&id->ingress_count, sizeof(int), 1, f);
-        if (id->ingress_count > 0)
-            fwrite(id->ingress, sizeof(Connection), id->ingress_count, f);
-
-        fwrite(&id->egress_count, sizeof(int), 1, f);
-        if (id->egress_count > 0)
-            fwrite(id->egress, sizeof(Connection), id->egress_count, f);
-
-        fwrite(&id->local_count, sizeof(int), 1, f);
-        if (id->local_count > 0)
-            fwrite(id->local, sizeof(Connection), id->local_count, f);
-
-        fwrite(&id->unix_count, sizeof(int), 1, f);
-        if (id->unix_count > 0)
-            fwrite(id->unix_socks, sizeof(UnixSocket), id->unix_count, f);
-    }
-
+    chmod(path, 0600);
+    write_snapshot(f, &node->snap);
     fclose(f);
     return 0;
 }

@@ -235,13 +235,13 @@ static void read_loginuid(int pid, unsigned int *loginuid) {
     sscanf(buf, "%u", loginuid);
 }
 
-static void read_ppid_and_starttime(int pid, int *ppid, long *starttime, long btime) {
+static void read_ppid_and_starttime(int pid, int *ppid, uint64_t *starttime, uint64_t btime) {
     char buf[512];
     read_proc_field(pid, "stat", buf, sizeof(buf), 0);
     char *p = strrchr(buf, ')');
     if (!p) { *ppid = -1; return; }
 
-    unsigned long long raw_starttime = 0;
+    uint64_t raw_starttime = 0;
 
     sscanf(p + 2,
         "%*c "          // 3:  state
@@ -259,8 +259,8 @@ static void read_ppid_and_starttime(int pid, int *ppid, long *starttime, long bt
     *starttime = (btime + raw_starttime / sysconf(_SC_CLK_TCK));
 }
 
-static unsigned long long read_btime(void) {
-    static unsigned long long btime = 0;
+static uint64_t read_btime(void) {
+    static uint64_t btime = 0;
     if (btime) return btime;
     FILE *f = fopen("/proc/stat", "r");
     if (f) {

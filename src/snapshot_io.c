@@ -28,47 +28,45 @@
  *   [4 bytes unix_count]
  *   [sizeof(UnixSocket) * unix_count]
  */
-void write_snapshot_binary(MachineSnapshot *snap) {
+int write_snapshot(FILE *f, MachineSnapshot *snap) {
     int magic = SNAPSHOT_MAGIC;
     int version = SNAPSHOT_VERSION;
-    write(STDOUT_FILENO, &magic, sizeof(int));
-    write(STDOUT_FILENO, &version, sizeof(int));
-    write(STDOUT_FILENO, &snap->identity_count, sizeof(int));
+    fwrite(&magic, sizeof(int), 1, f);
+    fwrite(&version, sizeof(int), 1, f);
+    fwrite(&snap->identity_count, sizeof(int), 1, f);
 
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
-        write(STDOUT_FILENO, &id->pid, sizeof(int));
-        write(STDOUT_FILENO, &id->ppid, sizeof(int));
-        write(STDOUT_FILENO, &id->loginuid, sizeof(unsigned int));
-        write(STDOUT_FILENO, &id->starttime, sizeof(unsigned long));
-        write(STDOUT_FILENO, id->exe, 256);
-        write(STDOUT_FILENO, id->cmdline, 512);
-        write(STDOUT_FILENO, id->cgroup, 256);
+        fwrite(&id->pid, sizeof(int), 1, f);
+        fwrite(&id->ppid, sizeof(int), 1, f);
+        fwrite(&id->loginuid, sizeof(unsigned int), 1, f);
+        fwrite(&id->starttime, sizeof(uint64_t), 1, f);
+        fwrite(id->exe, 256, 1, f);
+        fwrite(id->cmdline, 512, 1, f);
+        fwrite(id->cgroup, 256, 1, f);
 
-        write(STDOUT_FILENO, &id->ingress_count, sizeof(int));
-        if (id->ingress_count > 0) {
-            write(STDOUT_FILENO, id->ingress,
-                sizeof(Connection) * id->ingress_count);
-        }
+        fwrite(&id->ingress_count, sizeof(int), 1, f);
+        if (id->ingress_count > 0)
+            fwrite(id->ingress, sizeof(Connection), id->ingress_count, f);
 
-        write(STDOUT_FILENO, &id->egress_count, sizeof(int));
-        if (id->egress_count > 0) {
-            write(STDOUT_FILENO, id->egress,
-                sizeof(Connection) * id->egress_count);
-        }
+        fwrite(&id->egress_count, sizeof(int), 1, f);
+        if (id->egress_count > 0)
+            fwrite(id->egress, sizeof(Connection), id->egress_count, f);
 
-        write(STDOUT_FILENO, &id->local_count, sizeof(int));
-        if (id->local_count > 0) {
-            write(STDOUT_FILENO, id->local,
-                sizeof(Connection) * id->local_count);
-        }
+        fwrite(&id->local_count, sizeof(int), 1, f);
+        if (id->local_count > 0)
+            fwrite(id->local, sizeof(Connection), id->local_count, f);
 
-        write(STDOUT_FILENO, &id->unix_count, sizeof(int));
-        if (id->unix_count > 0) {
-            write(STDOUT_FILENO, id->unix_socks,
-                sizeof(UnixSocket) * id->unix_count);
-        }
+        fwrite(&id->unix_count, sizeof(int), 1, f);
+        if (id->unix_count > 0)
+            fwrite(id->unix_socks, sizeof(UnixSocket), id->unix_count, f);
     }
+
+    return 0;
+}
+
+void write_snapshot_binary(MachineSnapshot *snap) {
+    write_snapshot(stdout, snap);
 }
 
 static int safe_read(FILE *f, void *buf, size_t len) {
@@ -147,8 +145,9 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
         return -1;
 }
 
-static void print_utc(long *starttime){
-    struct tm *tm = gmtime(starttime);
+static void print_utc(uint64_t starttime) {
+    time_t t = (time_t)starttime;
+    struct tm *tm = gmtime(&t);
     char buf[64];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", tm);
     printf("  START_TIME:\t%s\n", buf);
@@ -162,7 +161,7 @@ void print_topology(MachineSnapshot *snap) {
         printf("  EXE:\t%s\n", id->exe);
         printf("  CMD:\t%s\n", id->cmdline);
         printf("  CGROUP:\t%s\n", id->cgroup);
-        print_utc(&id->starttime);
+        print_utc(id->starttime);
         printf("  LOGINUID:\t%u\n", id->loginuid);
 
         for (int j = 0; j < id->ingress_count; j++) {

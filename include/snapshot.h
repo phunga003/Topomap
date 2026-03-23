@@ -33,7 +33,7 @@ typedef struct {
     int pid;
     int ppid;
     unsigned int loginuid;
-    long starttime;
+    uint64_t starttime;
     char exe[256];
     char cmdline[512];
     char cgroup[256];
@@ -65,6 +65,7 @@ typedef struct {
 } MachineSnapshot;
 
 int snapshot_machine(MachineSnapshot *snap);
+int write_snapshot(FILE *f, MachineSnapshot *snap);
 void write_snapshot_binary(MachineSnapshot *snap);
 int read_snapshot(FILE *f, MachineSnapshot *snap);
 void print_topology(MachineSnapshot *snap);
