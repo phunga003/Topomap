@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <time.h>
 #include <schemas.h>
-#include "command_utils.h"
 
 /*
  * Snapshot wire format:
@@ -38,7 +37,7 @@
  * Connection layout: see connection_schema in schemas.c
  * UnixSocket layout: see unix_socket_schema in schemas.c
  *
- * Field order is defined by schemas in wire/schemas.c.
+ * Field order is defined by schemas in schemas.c.
  * To add or modify fields, update the relevant schema table there.
  */
 

@@ -87,7 +87,14 @@ fail:
     return -1;
 }
 
-// For surveyor debug
+static void print_utc(uint64_t starttime) {
+    time_t t = (time_t)starttime;
+    struct tm *tm = gmtime(&t);
+    char buf[64];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", tm);
+    printf("  START_TIME:\t%s\n", buf);
+}
+
 void print_topology(MachineSnapshot *snap) {
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
@@ -96,7 +103,7 @@ void print_topology(MachineSnapshot *snap) {
         printf("  EXE:\t%s\n", id->exe);
         printf("  CMD:\t%s\n", id->cmdline);
         printf("  CGROUP:\t%s\n", id->cgroup);
-        fprintf_utc(stdout, id->starttime);
+        print_utc(id->starttime);
         printf("  LOGINUID:\t%u\n", id->loginuid);
 
         for (int j = 0; j < id->ingress_count; j++) {
