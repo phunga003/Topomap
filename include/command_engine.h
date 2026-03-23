@@ -1,4 +1,5 @@
 
+#pragma once
 #ifndef COMMAND_ENGINE_H
 #define COMMAND_ENGINE_H
 

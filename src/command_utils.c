@@ -104,7 +104,7 @@ void print_unix_sock(FILE *out, UnixSocket *sock) {
         sock->inode);
 }
 
-static void fprintf_utc(FILE* out, long *starttime){
+static void fprintf_utc(FILE *out, long *starttime){
     struct tm *tm = gmtime(starttime);
     char buf[64];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", tm);
