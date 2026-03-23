@@ -8,6 +8,7 @@
 // --- Constants ---
 #define SNAPSHOT_VERSION 1
 #define SNAPSHOT_MAGIC 0x534E4150
+#define MAX_IDENTITIES 32768 
 
 // --- Connections ---
 

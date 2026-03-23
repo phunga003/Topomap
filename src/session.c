@@ -7,7 +7,8 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/wait.h>
-
+#include <arpa/inet.h>
+#include <assert.h>
 
 
 void session_snapshot_path(Session *s, const char *ip, char *buf, int bufsize) {
@@ -38,13 +39,9 @@ int session_init(Session *s, const char *workdir) {
     pthread_mutex_init(&s->stdout_lock, NULL);
 
     if (ensure_workdir(s->workdir) != 0) return -1;
+    if (session_load_node_records(s) != 0) return -1;
 
-    // NOTE: preregistering nodes based on existing 
-    // snap files are not working at the moment
-
-    // return session_load_all(s);
-
-    return 0;
+    return session_load_all(s);
 }
 
 void session_destroy(Session *s) {
@@ -126,6 +123,9 @@ int session_enroll(Session *s, const char *ip, const char *user) {
     snprintf(node->ip, sizeof(node->ip), "%s", ip);
     snprintf(node->user, sizeof(node->user), "%s", user);
     s->node_count++;
+
+    session_save_node_records(s);
+
     return 0;
 }
 
@@ -148,6 +148,7 @@ int session_unenroll(Session *s, const char *ip) {
         s->nodes[i] = s->nodes[i + 1];
     }
     s->node_count--;
+    session_save_node_records(s);
 
     return 0;
 }
@@ -223,7 +224,38 @@ int session_load_snapshot(Session *s, int node_idx) {
     return node->has_snapshot ? 0 : -1;
 }
 
+int session_save_node_records(Session *s) {
+    char path[512];
+    snprintf(path, sizeof(path), "%s/nodes.conf", s->workdir);
+    
+    FILE *f = fopen(path, "w");
+    if (!f) { perror("fopen"); return -1; }
+    chmod(path, 0600);
+
+    for (int i = 0; i < s->node_count; i++)
+        fprintf(f, "%s %s\n", s->nodes[i].ip, s->nodes[i].user);
+
+    fclose(f);
+    return 0;
+}
+
+int session_load_node_records(Session *s) {
+    char path[512];
+    snprintf(path, sizeof(path), "%s/nodes.conf", s->workdir);
+
+    FILE *f = fopen(path, "r");
+    if (!f) return 0;  // no conf yet, fresh start
+
+    char ip[INET6_ADDRSTRLEN], user[64];
+    while (fscanf(f, "%45s %63s", ip, user) == 2)
+        session_enroll(s, ip, user);
+
+    fclose(f);
+    return 0;
+}
+
 int session_load_all(Session *s) {
+    assert(s->node_count >= 0 && s->node_count <= MAX_NODES);
     DIR *d = opendir(s->workdir);
     if (!d) return 0;
 
@@ -232,16 +264,21 @@ int session_load_all(Session *s) {
         char *dot = strrchr(entry->d_name, '.');
         if (!dot || strcmp(dot, ".snap") != 0) continue;
 
-        char ip[64];
+        char ip[INET6_ADDRSTRLEN];
         int len = dot - entry->d_name;
-        if (len >= (int)sizeof(ip)) continue;
+        if (len <= 0 || len >= (int)sizeof(ip)) continue;
         memcpy(ip, entry->d_name, len);
         ip[len] = '\0';
 
-        if (session_enroll(s, ip, "") == 0) {
-            int idx = session_find_node(s, ip);
-            if (idx >= 0) session_load_snapshot(s, idx);
-        }
+        struct sockaddr_in sa4;
+        struct sockaddr_in6 sa6;
+        if (inet_pton(AF_INET, ip, &sa4.sin_addr) != 1 &&
+            inet_pton(AF_INET6, ip, &sa6.sin6_addr) != 1) continue;
+
+        int idx = session_find_node(s, ip);
+        if (idx < 0) continue;  // not in nodes.conf, skip
+
+        session_load_snapshot(s, idx);
     }
 
     closedir(d);

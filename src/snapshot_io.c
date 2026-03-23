@@ -88,54 +88,63 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
     }
     int version;
     if (safe_read(f, &version, sizeof(int)) != 0) return -1;
-    if (version != SNAPSHOT_VERSION) return -1; // TODO: Consider removing version cause of redundancy
+    if (version != SNAPSHOT_VERSION) return -1; 
+    
     if (safe_read(f, &snap->identity_count, sizeof(int)) != 0) return -1;
+    if (snap->identity_count <= 0 || snap->identity_count > MAX_IDENTITIES) return -1;
 
     snap->identities = malloc(sizeof(Identity) * snap->identity_count);
     if (!snap->identities) return -1;
+
+    // zero all entries upfront so free_snapshot is safe on partial reads
+    memset(snap->identities, 0, sizeof(Identity) * snap->identity_count); 
 
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
         memset(id, 0, sizeof(Identity));
 
-        if (safe_read(f, &id->pid, sizeof(int)) != 0) return -1;
-        if (safe_read(f, &id->ppid, sizeof(int)) != 0) return -1;
-        if (safe_read(f, &id->loginuid, sizeof(unsigned int)) != 0) return -1;
-        if (safe_read(f, &id->starttime, sizeof(unsigned long)) != 0) return -1; 
-        if (safe_read(f, id->exe, 256) != 0) return -1;
-        if (safe_read(f, id->cmdline, 512) != 0) return -1;
-        if (safe_read(f, id->cgroup, 256) != 0) return -1;
+        if (safe_read(f, &id->pid, sizeof(int)) != 0) goto fail;
+        if (safe_read(f, &id->ppid, sizeof(int)) != 0) goto fail;
+        if (safe_read(f, &id->loginuid, sizeof(unsigned int)) != 0) goto fail;
+        if (safe_read(f, &id->starttime, sizeof(unsigned long)) != 0) goto fail;
+        if (safe_read(f, id->exe, 256) != 0) goto fail;
+        if (safe_read(f, id->cmdline, 512) != 0) goto fail;
+        if (safe_read(f, id->cgroup, 256) != 0) goto fail;
 
-        if (safe_read(f, &id->ingress_count, sizeof(int)) != 0) return -1;
+        if (safe_read(f, &id->ingress_count, sizeof(int)) != 0) goto fail;
         if (id->ingress_count > 0) {
             id->ingress = malloc(sizeof(Connection) * id->ingress_count);
-            if (safe_read(f, id->ingress,
-                sizeof(Connection) * id->ingress_count) != 0) return -1;
+            if (!id->ingress) goto fail;
+            if (safe_read(f, id->ingress, sizeof(Connection) * id->ingress_count) != 0) goto fail;
         }
 
-        if (safe_read(f, &id->egress_count, sizeof(int)) != 0) return -1;
+        if (safe_read(f, &id->egress_count, sizeof(int)) != 0) goto fail;
         if (id->egress_count > 0) {
             id->egress = malloc(sizeof(Connection) * id->egress_count);
-            if (safe_read(f, id->egress,
-                sizeof(Connection) * id->egress_count) != 0) return -1;
+            if (!id->egress) goto fail;
+            if (safe_read(f, id->egress, sizeof(Connection) * id->egress_count) != 0) goto fail;
         }
 
-        if (safe_read(f, &id->local_count, sizeof(int)) != 0) return -1;
+        if (safe_read(f, &id->local_count, sizeof(int)) != 0) goto fail;
         if (id->local_count > 0) {
             id->local = malloc(sizeof(Connection) * id->local_count);
-            if (safe_read(f, id->local,
-                sizeof(Connection) * id->local_count) != 0) return -1;
+            if (!id->local) goto fail;
+            if (safe_read(f, id->local, sizeof(Connection) * id->local_count) != 0) goto fail;
         }
 
-        if (safe_read(f, &id->unix_count, sizeof(int)) != 0) return -1;
+        if (safe_read(f, &id->unix_count, sizeof(int)) != 0) goto fail;
         if (id->unix_count > 0) {
             id->unix_socks = malloc(sizeof(UnixSocket) * id->unix_count);
-            if (safe_read(f, id->unix_socks,
-                sizeof(UnixSocket) * id->unix_count) != 0) return -1;
+            if (!id->unix_socks) goto fail;
+            if (safe_read(f, id->unix_socks, sizeof(UnixSocket) * id->unix_count) != 0) goto fail;
         }
     }
 
     return 0;
+
+    fail:
+        free_snapshot(snap);
+        return -1;
 }
 
 static void print_utc(long *starttime){

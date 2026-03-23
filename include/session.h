@@ -4,6 +4,7 @@
 
 #include "snapshot.h"
 #include <pthread.h>
+#include <arpa/inet.h>
 
 #define MAX_NODES 64
 #define WORKDIR_PATH "./surveyor_workdir"
@@ -20,7 +21,7 @@ typedef struct {
 } CommandArgs;
 
 typedef struct {
-    char ip[64];
+    char ip[INET6_ADDRSTRLEN];
     char user[64];
     MachineSnapshot snap;
     int has_snapshot;
@@ -55,6 +56,8 @@ int session_setup_ssh(Session *s, const char *ip, const char *user);
 int session_enroll(Session *s, const char *ip, const char *user);
 int session_unenroll(Session *s, const char *ip);
 int session_find_node(Session *s, const char *ip);
+int session_save_node_records(Session *s);
+int session_load_node_records(Session *s);
 
 int session_save_snapshot(Session *s, int node_idx);
 int session_load_snapshot(Session *s, int node_idx);
