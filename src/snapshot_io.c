@@ -3,8 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-
+#include <time.h>
 /*
  * write_snapshot_binary
  *
@@ -15,6 +14,8 @@
  * per identity:
  *   [4 bytes pid]
  *   [4 bytes ppid]
+ *   [4 bytes loginuid]
+ *   [8 bytes starttime]
  *   [256 bytes exe]
  *   [512 bytes cmdline]
  *   [256 bytes cgroup]
@@ -38,6 +39,8 @@ void write_snapshot_binary(MachineSnapshot *snap) {
         Identity *id = &snap->identities[i];
         write(STDOUT_FILENO, &id->pid, sizeof(int));
         write(STDOUT_FILENO, &id->ppid, sizeof(int));
+        write(STDOUT_FILENO, &id->loginuid, sizeof(unsigned int));
+        write(STDOUT_FILENO, &id->starttime, sizeof(unsigned long));
         write(STDOUT_FILENO, id->exe, 256);
         write(STDOUT_FILENO, id->cmdline, 512);
         write(STDOUT_FILENO, id->cgroup, 256);
@@ -97,6 +100,8 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
 
         if (safe_read(f, &id->pid, sizeof(int)) != 0) return -1;
         if (safe_read(f, &id->ppid, sizeof(int)) != 0) return -1;
+        if (safe_read(f, &id->loginuid, sizeof(unsigned int)) != 0) return -1;
+        if (safe_read(f, &id->starttime, sizeof(unsigned long)) != 0) return -1; 
         if (safe_read(f, id->exe, 256) != 0) return -1;
         if (safe_read(f, id->cmdline, 512) != 0) return -1;
         if (safe_read(f, id->cgroup, 256) != 0) return -1;
@@ -133,14 +138,23 @@ int read_snapshot(FILE *f, MachineSnapshot *snap) {
     return 0;
 }
 
+static void print_utc(long *starttime){
+    struct tm *tm = gmtime(starttime);
+    char buf[64];
+    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S UTC", tm);
+    printf("  START_TIME:\t%s\n", buf);
+}
+
 void print_topology(MachineSnapshot *snap) {
     for (int i = 0; i < snap->identity_count; i++) {
         Identity *id = &snap->identities[i];
 
         printf("=== PID:%d PPID:%d ===\n", id->pid, id->ppid);
-        printf("  EXE:    %s\n", id->exe);
-        printf("  CMD:    %s\n", id->cmdline);
-        printf("  CGROUP: %s\n", id->cgroup);
+        printf("  EXE:\t%s\n", id->exe);
+        printf("  CMD:\t%s\n", id->cmdline);
+        printf("  CGROUP:\t%s\n", id->cgroup);
+        print_utc(&id->starttime);
+        printf("  LOGINUID:\t%u\n", id->loginuid);
 
         for (int j = 0; j < id->ingress_count; j++) {
             Connection *c = &id->ingress[j];

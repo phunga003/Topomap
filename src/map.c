@@ -278,7 +278,6 @@ static void resolve_proxy_chains(Session *s, MapIndex *idx, ChainList *chains) {
                 if (!proxy) continue;
                 if (proxy_node != n) continue;
 
-                // find proxy's identity index
                 int proxy_idx = -1;
                 for (int j = 0; j < snap->identity_count; j++) {
                     if (&snap->identities[j] == proxy) { proxy_idx = j; break; }

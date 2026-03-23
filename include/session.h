@@ -1,3 +1,4 @@
+#pragma once
 #ifndef SESSION_H
 #define SESSION_H
 
@@ -11,10 +12,9 @@
 #define DEFAULT_USER "root"
 
 typedef struct Session Session;
-typedef struct CommandArgs CommandArgs;
 typedef struct Command Command;
 
-typedef struct CommandArgs {
+typedef struct {
     int argc;
     char *argv[16]; 
 } CommandArgs;

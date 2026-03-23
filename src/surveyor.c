@@ -170,7 +170,6 @@ static int read_all_connections(MachineSnapshot *snap) {
         }
     }
 
-    // flatten unix sockets
     snap->unix_sockets = malloc(sizeof(UnixSocket) * unix_ctx.count);
     snap->unix_count = 0;
     map_init(&snap->unix_map);
@@ -230,13 +229,47 @@ static void read_cmdline(int pid, char *buf, int bufsize) {
     }
 }
 
-static void read_ppid(int pid, int *ppid) {
+static void read_loginuid(int pid, unsigned int *loginuid) {
+    char buf[64];
+    read_proc_field(pid, "loginuid", buf, sizeof(buf), 0);
+    sscanf(buf, "%u", loginuid);
+}
+
+static void read_ppid_and_starttime(int pid, int *ppid, long *starttime, long btime) {
     char buf[512];
     read_proc_field(pid, "stat", buf, sizeof(buf), 0);
     char *p = strrchr(buf, ')');
     if (!p) { *ppid = -1; return; }
-    int dummy;
-    sscanf(p + 2, "%c %d", (char *)&dummy, ppid);
+
+    unsigned long long raw_starttime = 0;
+
+    sscanf(p + 2,
+        "%*c "          // 3:  state
+        "%d "           // 4:  ppid
+        "%*d %*d %*d "  // 5-7: pgrp, session, tty_nr
+        "%*d %*d %*d "  // 8-10: tpgid, flags, minflt
+        "%*d %*d %*d "  // 11-13: cminflt, majflt, cmajflt
+        "%*d %*d %*d "  // 14-16: utime, stime, cutime
+        "%*d %*d %*d "  // 17-19: cstime, priority, nice
+        "%*d %*d "      // 20-21: num_threads, itrealvalue
+        "%llu",         // 22: starttime
+        ppid, &raw_starttime
+    );
+
+    *starttime = (btime + raw_starttime / sysconf(_SC_CLK_TCK));
+}
+
+static unsigned long long read_btime(void) {
+    static unsigned long long btime = 0;
+    if (btime) return btime;
+    FILE *f = fopen("/proc/stat", "r");
+    if (f) {
+        char line[64];
+        while (fgets(line, sizeof(line), f))
+            if (sscanf(line, "btime %llu", &btime) == 1) break;
+        fclose(f);
+    }
+    return btime;
 }
 
 static int collect_socket_inodes(int pid, unsigned long *inodes, int max) {
@@ -273,6 +306,7 @@ typedef struct {
     int num_workers;
     Identity *identities;   // pre-allocated, each worker writes to its own slots
     int *identity_count;     // per-worker count
+    unsigned long long btime;
 } PidWorkerCtx;
 
 static void *pid_worker(void *arg) {
@@ -292,9 +326,10 @@ static void *pid_worker(void *arg) {
         id->pid = pid;
         read_proc_field(pid, "exe", id->exe, sizeof(id->exe), 1);
         read_cmdline(pid, id->cmdline, sizeof(id->cmdline));
+        read_loginuid(pid, &id->loginuid);
         read_proc_field(pid, "cgroup", id->cgroup, sizeof(id->cgroup), 0);
         id->cgroup[strcspn(id->cgroup, "\n")] = '\0';
-        read_ppid(pid, &id->ppid);
+        read_ppid_and_starttime(pid, &id->ppid, &id->starttime, ctx->btime);
 
         id->sock_inodes = malloc(sizeof(unsigned long) * inode_count);
         memcpy(id->sock_inodes, inodes, sizeof(unsigned long) * inode_count);
@@ -317,6 +352,8 @@ static int build_identities(MachineSnapshot *snap) {
     pthread_t threads[NUM_WORKERS];
     PidWorkerCtx ctxs[NUM_WORKERS];
 
+    unsigned long long btime = read_btime();
+
     for (int i = 0; i < NUM_WORKERS; i++) {
         worker_results[i] = malloc(sizeof(Identity) * max_per_worker);
         worker_counts[i] = 0;
@@ -326,7 +363,8 @@ static int build_identities(MachineSnapshot *snap) {
             .worker_id = i,
             .num_workers = NUM_WORKERS,
             .identities = worker_results[i],
-            .identity_count = &worker_counts[i]
+            .identity_count = &worker_counts[i],
+            .btime = btime
         };
         pthread_create(&threads[i], NULL, pid_worker, &ctxs[i]);
     }

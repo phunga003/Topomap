@@ -101,6 +101,7 @@ static int cmd_scan(Session *s, CommandArgs *args) {
 
         if (target.success) {
             if (s->nodes[idx].has_snapshot) {
+                // TODO: Save diff before overwrite.
                 diff_snapshots(s->nodes[idx].ip, &s->nodes[idx].snap, &target.snap);
                 free_snapshot(&s->nodes[idx].snap);
             }
@@ -312,12 +313,12 @@ typedef struct {
 } CommandDef;
 
 static CommandDef commands[] = {
-    { "list",    "list",                "Show all enrolled nodes",                  cmd_list },
-    { "enroll",  "enroll <ip> [user]",  "Add a node for surveying",                 cmd_enroll },
-    { "unenroll","unenroll <ip>",       "Remove a node",                            cmd_unenroll },
-    { "scan",    "scan [ip]",           "Scan enrolled nodes",                      cmd_scan },
-    { "report",  "report [ip] [file]",  "Print topology report",                    cmd_report },
-    { "map",     "map [file]",    "Print topology map",   cmd_map },
+    { "list",    "list",                "Show all enrolled nodes",      cmd_list },
+    { "enroll",  "enroll <ip> [user]",  "Add a node for surveying",     cmd_enroll },
+    { "unenroll","unenroll <ip>",       "Remove a node",                cmd_unenroll },
+    { "scan",    "scan [ip]",           "Scan enrolled nodes",          cmd_scan },
+    { "report",  "report [ip] [file]",  "Print topology report",        cmd_report },
+    { "map",     "map [file]",          "Print topology map",           cmd_map },
     { "exec", "exec <ip> <bin> | exec shell <ip> <cmd>", "Execute binary or shell command on node", cmd_exec },
 };
 

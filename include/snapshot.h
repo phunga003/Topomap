@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include "hashmap.h"
 
-// --- Constatnts ---
+// --- Constants ---
 #define SNAPSHOT_VERSION 1
 #define SNAPSHOT_MAGIC 0x534E4150
 
@@ -30,6 +30,8 @@ typedef struct {
 typedef struct {
     int pid;
     int ppid;
+    unsigned int loginuid;
+    long starttime;
     char exe[256];
     char cmdline[512];
     char cgroup[256];
