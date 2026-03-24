@@ -1,5 +1,7 @@
 # Topomap
 
+![C](https://img.shields.io/badge/c-%2300599C.svg?style=for-the-badge&logo=c&logoColor=white)![Bash Script](https://img.shields.io/badge/bash_script-%23121011.svg?style=for-the-badge&logo=gnu-bash&logoColor=white)![CMake](https://img.shields.io/badge/CMake-%23008FBA.svg?style=for-the-badge&logo=cmake&logoColor=white)![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)
+
 A lightweight service topology mapper that tells you what is running on your machines, what is talking to what, and what you need to pay attention to.
 
 ## The Problem
@@ -29,6 +31,8 @@ What looks exposed, unresolved, or suspicious.
 It does this without installing anything on the target machines.
 
 ## How It Works
+
+> ℹ️ Architecture documentations is located in `/docs/ARCHITECTURE.md`
 
 Linux processes are files. Everything about a running process, its binary, its connections, its file descriptors, is exposed through the `/proc` filesystem. Topomap reads these files directly.
 
