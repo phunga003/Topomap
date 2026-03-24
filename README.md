@@ -32,7 +32,7 @@ It does this without installing anything on the target machines.
 
 ## How It Works
 
-> ℹ️ Architecture documentations is located in `/docs/ARCHITECTURE.md`
+> ℹ️ Architecture documentations is located in [`/docs/ARCHITECTURE.md`](https://github.com/phunga003/Topomap/blob/main/docs/ARCHITECTURE.md)
 
 Linux processes are files. Everything about a running process, its binary, its connections, its file descriptors, is exposed through the `/proc` filesystem. Topomap reads these files directly.
 
