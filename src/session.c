@@ -152,8 +152,12 @@ int session_save_snapshot(Session *s, int node_idx) {
 
     FILE *f = fopen(path, "wb");
     if (!f) { perror("save snapshot"); return -1; }
-
-    chmod(path, 0600);
+    if (fchmod(fileno(f), 0600) == -1) {
+        perror("chmod");
+        fclose(f);
+        return -1;
+    }
+    
     write_snapshot(f, &node->snap);
     fclose(f);
     return 0;
