@@ -187,7 +187,11 @@ int session_save_node_records(Session *s) {
     
     FILE *f = fopen(path, "w");
     if (!f) { perror("fopen"); return -1; }
-    chmod(path, 0600);
+    if (fchmod(fileno(f), 0600) == -1) {
+        perror("chmod");
+        fclose(f);
+        return -1;
+    }
 
     for (int i = 0; i < s->node_count; i++)
         fprintf(f, "%s %s\n", s->nodes[i].ip, s->nodes[i].user);
