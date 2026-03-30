@@ -1,4 +1,4 @@
-# Atchitecture document
+# Architecture document
 
 ## Overview
 Topomap is a rapid deploy security auditing tool. The tool works by deploying surveyors on target machines through ssh to take a snapshot of `/proc` and stream the result back to a central host for analysis. The tool is designed for rapid deployment across many nodes without needing extra configurations.
